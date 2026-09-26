@@ -1,0 +1,16 @@
+{
+  "language": "en-US",
+  "summarize": true,
+  "obsidian_enabled": true,
+  "vault_notes_dir": "~/Documents/RecBlitz",
+  "drive_enabled": false,
+  "drive_remote": "gdrive:",
+  "drive_folder_id": "",
+  "video_folder_id": "",
+  "video_public": true,
+  "share_script_url": "",
+  "screen_max_dimension": 2560,
+  "countdown_seconds": 3,
+  "delete_local_after_upload": true,
+  "webcam_size": 160
+}

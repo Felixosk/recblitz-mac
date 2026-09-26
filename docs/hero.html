@@ -1,0 +1,60 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  /* Titelbild. Panel und Einstellungen sind echte Renderings der App
+     (RecBlitz --render-panel ... --lang=en --demo-config), nur die Szene
+     drumherum ist HTML. Farben wie die MeetingBlitz-Webseite. */
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { width:1280px; height:620px; overflow:hidden; position:relative;
+    background: linear-gradient(150deg,#16233d 0%,#22405f 55%,#2c5570 100%);
+    font: 400 14px -apple-system,"SF Pro Text","Helvetica Neue",sans-serif; color:#fff; }
+  .menubar { height:26px; background:rgba(8,14,26,.72); display:flex; align-items:center;
+    justify-content:flex-end; gap:18px; padding:0 18px; font-size:13px; color:#e6edf6; }
+  .menubar .rec { display:flex; align-items:center; gap:6px; color:#ff6259; font-weight:600;
+    font-variant-numeric:tabular-nums; }
+  .menubar .rec i { width:10px; height:10px; border-radius:50%; background:#ff453a; display:block; }
+  .panel { position:absolute; right:52px; top:40px; width:340px; border-radius:13px; overflow:hidden;
+    box-shadow:0 24px 64px rgba(0,0,0,.55); border:.5px solid rgba(255,255,255,.10); }
+  .panel img { width:340px; display:block; }
+  .banner { position:absolute; left:250px; top:92px; width:400px; padding:14px 18px 14px 14px;
+    border-radius:18px; display:flex; gap:12px; align-items:flex-start;
+    background:linear-gradient(135deg,#18A9B4,#0A4E58); border:1px solid rgba(46,199,160,.35);
+    box-shadow:0 18px 50px rgba(4,20,30,.5); }
+  .banner .ic { width:34px; height:34px; border-radius:50%; background:rgba(0,0,0,.22); flex:none;
+    display:flex; align-items:center; justify-content:center; }
+  .banner b { display:block; font-size:15px; font-weight:600; }
+  .banner p { font-size:13px; color:#EAF6F2; margin-top:3px; line-height:1.35; }
+  .banner small { display:block; font-size:11.5px; color:rgba(234,246,242,.7); margin-top:5px; }
+  .note { position:absolute; left:170px; top:196px; width:420px; padding:16px 18px; border-radius:12px;
+    background:rgba(7,14,27,.55); border:1px solid rgba(255,255,255,.10); font-size:12.5px; color:#c9d6e6;
+    box-shadow:0 18px 50px rgba(0,0,0,.35); line-height:1.5; }
+  .note .h { color:#fff; font-weight:700; font-size:14px; margin-bottom:4px; }
+  .note .m { color:#8fa0b5; font-style:italic; font-size:11.5px; margin-bottom:8px; }
+  .note .s { color:#8EE6C8; font-weight:600; font-size:12px; margin-top:6px; }
+  h1 { position:absolute; left:74px; top:466px; font-size:44px; letter-spacing:-1.2px; font-weight:800; }
+  .sub { position:absolute; left:74px; top:528px; width:640px; font-size:17px; color:#c9d6e6; line-height:1.5; }
+  .sub b { color:#8EE6C8; font-weight:600; }
+</style>
+<div class="menubar"><span class="rec"><i></i>0:42</span><span>Fri 26 Sep 10:12</span></div>
+
+<div class="banner">
+  <div class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="#8EE6C8"><rect x="2" y="9" width="3" height="6" rx="1.5"/><rect x="7" y="5" width="3" height="14" rx="1.5"/><rect x="12" y="2" width="3" height="20" rx="1.5"/><rect x="17" y="6" width="3" height="12" rx="1.5"/></svg></div>
+  <div><b>Video ready · link copied</b>
+    <p>A quick walkthrough of the new onboarding flow and the two open questions.</p>
+    <small>Click opens the video</small></div>
+</div>
+
+<div class="note">
+  <div class="h">Onboarding flow walkthrough - 2026-09-26 10.12 - RecBlitz</div>
+  <div class="m">Voice note · 0:42 min · 118 words · Apple Speech (on-device)</div>
+  <div class="s">Summary</div>
+  <div>The new sign-up skips the survey and lands people on the dashboard. Two questions stay open.</div>
+  <div class="s">Next steps</div>
+  <div>- Move the survey to day 2<br>- Check the empty state copy</div>
+</div>
+
+<div class="panel"><img src="raw/panel-recording.png"></div>
+
+<h1>Say it once. Get the note.</h1>
+<div class="sub">One click records your voice or your screen. RecBlitz <b>transcribes it on your Mac</b>
+and hands you a titled note, a Google Doc and a share link.</div>

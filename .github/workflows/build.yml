@@ -1,0 +1,54 @@
+name: Build
+
+# Proves the one thing that actually breaks for other people: that a clean
+# checkout builds on a Mac that has neither the author's signing certificate
+# nor a `signing.local` file. build.sh falls back to ad-hoc signing in that
+# case, and this job is the only place that path is ever exercised.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        # Pick the newest Xcode on the runner rather than its default. The app
+        # uses Apple's SpeechAnalyzer and Liquid Glass, both need the macOS 26
+        # SDK; an older default Xcode would fail on APIs nobody ships without.
+        # The version is printed so a failure here is never a mystery.
+        run: |
+          latest="$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)"
+          if [ -n "$latest" ]; then
+            echo "selecting $latest"
+            sudo xcode-select -s "$latest"
+          fi
+          swift --version
+          xcodebuild -version || true
+
+      - name: Build (universal, ad-hoc signed, runs both self-tests)
+        # build.sh lints the UI texts, runs `pipeline.py --selftest`, compiles
+        # both architectures, assembles and signs the bundle and finishes with
+        # `RecBlitz --selftest`. Use the runner's timeout-minutes, not the
+        # `timeout` command: that is GNU coreutils and missing on macOS.
+        timeout-minutes: 15
+        run: ./build.sh
+
+      - name: Both architectures present
+        run: |
+          archs="$(lipo -archs dist/RecBlitz.app/Contents/MacOS/RecBlitz)"
+          echo "archs: $archs"
+          case "$archs" in *arm64*) ;; *) echo "::error::arm64 missing"; exit 1 ;; esac
+          case "$archs" in *x86_64*) ;; *) echo "::error::x86_64 missing"; exit 1 ;; esac
+
+      - name: Bundle is signed and complete
+        run: |
+          codesign --verify --strict --verbose=2 dist/RecBlitz.app
+          test -f dist/RecBlitz.app/Contents/Resources/pipeline.py
+          test -f dist/RecBlitz.app/Contents/Resources/AppIcon.icns

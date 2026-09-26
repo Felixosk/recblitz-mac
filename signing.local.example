@@ -1,0 +1,15 @@
+# Template: copy to signing.local to sign the app with a stable self-signed
+# certificate instead of ad-hoc.
+#
+# WHY this is worth it: with ad-hoc signing the app's identity changes on EVERY
+# build. macOS then treats it as a new app and drops the permissions you granted
+# (microphone, screen recording, camera). You allow them again, rebuild once,
+# and they are gone again.
+#
+# Create a certificate: Keychain Access -> Certificate Assistant ->
+# "Create a Certificate", type "Code Signing", self-signed.
+# Read its fingerprint:
+#     security find-certificate -c "MY NAME" -Z | awk '/SHA-1 hash:/ {print $3}'
+
+SIGN_ID="My Dev Signing"
+SIGN_SHA1="AAAA1111BBBB2222CCCC3333DDDD4444EEEE5555"
