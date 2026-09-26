@@ -280,21 +280,24 @@ public final class ScreenRecorder {
     }
 
     /// Alle aufnehmbaren Bildschirme, für die Auswahl in der UI.
+    /// Bildschirme für die Auswahl im Panel. Bewusst über `NSScreen` statt
+    /// `SCShareableContent`: Letzteres braucht die Bildschirmaufnahme-Freigabe,
+    /// und weil das Panel die Liste bei JEDEM Öffnen holt, kam sonst schon beim
+    /// bloßen Aufklappen die macOS-Abfrage „möchte den Bildschirm aufnehmen"
+    /// (Rückmeldung 26.09.). Gefragt wird erst, wenn wirklich aufgenommen wird.
+    @MainActor
     public static func availableDisplays() async -> [CaptureDisplay] {
-        guard let content = try? await SCShareableContent
-            .excludingDesktopWindows(false, onScreenWindowsOnly: true) else { return [] }
         let main = CGMainDisplayID()
-        return content.displays.enumerated().map { idx, d in
-            let screen = NSScreen.screens.first {
-                ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID) == d.displayID
-            }
-            let scale = screen?.backingScaleFactor ?? 2
+        return NSScreen.screens.enumerated().compactMap { idx, screen in
+            guard let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+            else { return nil }
+            let scale = screen.backingScaleFactor
             return CaptureDisplay(
-                id: d.displayID,
-                name: screen?.localizedName ?? "Bildschirm \(idx + 1)",
-                isMain: d.displayID == main,
-                pixelWidth: Int(CGFloat(d.width) * scale),
-                pixelHeight: Int(CGFloat(d.height) * scale))
+                id: id,
+                name: screen.localizedName.isEmpty ? "Display \(idx + 1)" : screen.localizedName,
+                isMain: id == main,
+                pixelWidth: Int(screen.frame.width * scale),
+                pixelHeight: Int(screen.frame.height * scale))
         }
     }
 
