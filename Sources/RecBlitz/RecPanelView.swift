@@ -12,7 +12,7 @@ struct RecPanelView: View {
     @State private var displays: [CaptureDisplay] = []
     var onSize: (CGSize) -> Void
 
-    static let width: CGFloat = 340
+    static let width: CGFloat = 360
 
     /// Während Vorbereitung oder Aufnahme sind die Optionen gesperrt: ein
     /// Wechsel mitten in der Aufnahme hätte keine Wirkung mehr.
@@ -334,7 +334,7 @@ struct RecPanelView: View {
 /// Die letzte Aufnahme als Zeile, gebaut wie eine MeetingBlitz-Terminzeile:
 /// Symbol, Uhrzeit, Titel, rechts die Aktionen. Klick auf die Zeile öffnet das
 /// beste vorhandene Ergebnis (Video, Doc, Notiz).
-private struct LastRow: View {
+struct LastRow: View {
     let result: LastResult
     let transcript: String?
     @State private var hovering = false
@@ -344,6 +344,11 @@ private struct LastRow: View {
         f.locale = Locale(identifier: L.isDE ? "de_DE" : "en_US")
         f.dateFormat = Calendar.current.isDateInToday(result.date) ? "HH:mm" : (L.isDE ? "dd.MM." : "MMM d")
         return f.string(from: result.date)
+    }
+
+    static func displayTitle(_ raw: String) -> String {
+        raw.replacingOccurrences(of: #" - \d{4}-\d{2}-\d{2} \d{2}\.\d{2} - RecBlitz$"#,
+                                 with: "", options: .regularExpression)
     }
 
     private var markdownURL: URL? { result.markdownPath.map { URL(fileURLWithPath: $0) } }
@@ -360,10 +365,12 @@ private struct LastRow: View {
                 .font(.system(size: 12, weight: .medium).monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(width: 42, alignment: .leading)
-            Text(result.title)
+            // Ohne den Anhang „ - 2026-09-26 10.29 - RecBlitz": die Uhrzeit steht
+            // schon links, und der Anhang frisst genau den Platz, der dem Titel
+            // fehlt. Zwei Zeilen statt „…" (Rückmeldung 26.09.).
+            Text(Self.displayTitle(result.title))
                 .font(.system(size: 12))
-                .lineLimit(1)
-                .truncationMode(.tail)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 4)
             if let video = result.videoURL {
                 RowIconButton(icon: "link", help: video.isFileURL

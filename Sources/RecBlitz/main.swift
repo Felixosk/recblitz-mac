@@ -933,7 +933,8 @@ if cliArgs.count >= 3, cliArgs[1] == "--render-panel" {
         dummy.last = nil
         dummy.lastTranscript = nil
         if mode != "empty" {
-            dummy.last = LastResult(title: L.t("Ablauf für das neue Onboarding", "Onboarding flow walkthrough"),
+            dummy.last = LastResult(title: L.t("Ablauf für das neue Onboarding und die zwei offenen Fragen - 2026-09-26 10.29 - RecBlitz",
+                                                 "Onboarding flow walkthrough and the two open questions - 2026-09-26 10.29 - RecBlitz"),
                                     date: Date(), docURL: URL(string: "https://example.com/doc"),
                                     videoURL: mode == "idle" ? nil : URL(string: "https://example.com/video"),
                                     markdownPath: nil)
@@ -960,6 +961,8 @@ if cliArgs.count >= 2, cliArgs[1] == "--selftest" {
            "folderID aus Drive-Link")
     expect(ConfigStore.folderID(from: "  1AbC-d_E9 ") == "1AbC-d_E9", "folderID aus nackter ID")
     expect(ConfigStore.folderID(from: "") == "", "folderID leer")
+    expect(LastRow.displayTitle("Plan fürs Onboarding - 2026-09-26 10.29 - RecBlitz") == "Plan fürs Onboarding",
+           "Titel ohne Datumsanhang")
     let sample = LastResult(title: "T", date: Date(timeIntervalSince1970: 0),
                             docURL: URL(string: "https://example.com"), videoURL: nil, markdownPath: "/tmp/x.md")
     let roundTrip = (try? JSONEncoder().encode(sample)).flatMap { try? JSONDecoder().decode(LastResult.self, from: $0) }

@@ -31,10 +31,13 @@ struct PillSegment<ID: Hashable>: View {
                         if let icon = item.icon {
                             Image(systemName: icon).font(.system(size: 10.5, weight: .semibold))
                         }
+                        // Nie kürzen: „Bildschi…" sah kaputt aus (Rückmeldung
+                        // 26.09.). Das Wort behält seine volle Breite, die Felder
+                        // teilen sich den Rest.
                         Text(item.label)
                             .font(.system(size: 11.5, weight: on ? .semibold : .medium))
                             .lineLimit(1)
-                            .minimumScaleFactor(0.8)
+                            .fixedSize()
                     }
                     .frame(maxWidth: .infinity, minHeight: 24)
                     .padding(.horizontal, 3)
