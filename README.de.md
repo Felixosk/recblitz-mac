@@ -60,7 +60,7 @@ nimm sie, wenn du nur das brauchst.
 | Ergebnis | Markdown-Notiz, optional Google Doc + Drive-Link | Freigabe-Link, lokaler Export | Text wird in die aktive App eingefügt | Text wird in die aktive App eingefügt | Videodatei |
 | Titel + Zusammenfassung pro Aufnahme | ja, optional | nein | nein | nein | nein |
 | Konto nötig | nein | ja | nein | nein | nein |
-| Lizenz | MIT | AGPL-3.0 | MIT | GPL-3.0 | AGPL-3.0 |
+| Lizenz | PolyForm Strict | AGPL-3.0 | MIT | GPL-3.0 | AGPL-3.0 |
 | Sterne | neu | 22,8k | 32,2k | 6,6k | 8,7k |
 
 Ehrlich gesagt: zum Diktieren in andere Apps sind Handy und VoiceInk
@@ -223,4 +223,4 @@ hält. Wer oft baut, legt ein selbstsigniertes Zertifikat an und kopiert
 
 ## Lizenz
 
-MIT, siehe [LICENSE](LICENSE).
+PolyForm Strict 1.0.0. Private und andere nicht-kommerzielle Nutzung ist erlaubt. Den Code ändern, darauf aufbauen und weitergeben ist nicht erlaubt. Siehe [LICENSE](LICENSE).

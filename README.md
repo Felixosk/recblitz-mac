@@ -58,7 +58,7 @@ do, so pick them if that is all you need.
 | Result | Markdown note, optional Google Doc + Drive link | share link, local export | text pasted into the active app | text pasted into the active app | video file |
 | Title + summary per recording | yes, optional | no | no | no | no |
 | Account needed | no | yes | no | no | no |
-| License | MIT | AGPL-3.0 | MIT | GPL-3.0 | AGPL-3.0 |
+| License | PolyForm Strict | AGPL-3.0 | MIT | GPL-3.0 | AGPL-3.0 |
 | Stars | new | 22.8k | 32.2k | 6.6k | 8.7k |
 
 Honestly: for dictating into other apps, Handy and VoiceInk are
@@ -218,4 +218,4 @@ one. If you build often, create a self-signed certificate and copy
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+PolyForm Strict 1.0.0. Personal and other noncommercial use is allowed. Changing the code, building on it and passing it on are not allowed. See [LICENSE](LICENSE).
