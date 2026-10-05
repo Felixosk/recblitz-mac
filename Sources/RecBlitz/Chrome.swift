@@ -150,10 +150,10 @@ struct ChipToggle: View {
             HStack(spacing: 4) {
                 Image(systemName: isOn ? icon : offIcon)
                     .font(.system(size: 10, weight: .semibold))
-                Text(label).font(.system(size: 11, weight: isOn ? .semibold : .medium))
+                Text(label).font(.system(size: 11, weight: isOn ? .semibold : .medium)).lineLimit(1).fixedSize()
             }
             .foregroundStyle(isOn ? Color.accentColor : hovered ? Color.primary : Color.secondary)
-            .padding(.horizontal, 8).padding(.vertical, 4)
+            .padding(.horizontal, 6).padding(.vertical, 4)
             .background(RoundedRectangle(cornerRadius: 6)
                 .fill(isOn ? Color.accentColor.opacity(0.15)
                       : Color.primary.opacity(hovered ? 0.10 : 0.06)))

@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.1 (2026-10-05)
+
+- The mode *Audio* is now *Audio only*
+- *Mic* and *System* sound are two switches in all three modes, both on by
+  default. *Audio only* can now record system sound, so an online call is
+  transcribed with both sides and no video is kept
+- If both switches are off, recording does not start (no silent files), the
+  panel says why
+- *Audio only* with system sound needs the screen recording permission and
+  macOS 15; without it you get a banner instead of a quiet fallback to the
+  microphone
+- License changed to PolyForm Strict 1.0.0
+
 ## 2.0 (2026-09-26)
 
 First public release.

@@ -39,8 +39,12 @@ final class ConfigStore: ObservableObject {
     /// "off" | "screen" | "region". Default "off": der Normalfall bleibt die
     /// reine Sprachnotiz, Bildschirm ist eine bewusste Entscheidung.
     @Published var screenMode: String = "off"
-    /// Zusätzlich zum Mikro den Systemton mitnehmen (Video im Screencast o.ä.).
-    @Published var screenSystemAudio: Bool = false
+    /// Mikrofon aufnehmen. Default an. Zusammen mit dem Systemton die Absicherung
+    /// für Calls: ohne beide gibt es keine Aufnahme (05.10.).
+    @Published var captureMicrophone: Bool = true
+    /// Systemton mitnehmen (die andere Seite im Call, Videos). Default an,
+    /// denn Telegram-Calls im „Nur Ton"-Modus hatten nur das Mikro (05.10.).
+    @Published var screenSystemAudio: Bool = true
     /// Längste Kante des Videos. 0 = native Auflösung.
     @Published var screenMaxDimension: Int = 2560
     /// Eigener Drive-Ordner für Videos (leer = derselbe wie für die Docs).
@@ -88,7 +92,8 @@ final class ConfigStore: ObservableObject {
         driveEnabled = dict["drive_enabled"] as? Bool ?? false
         driveRemote = dict["drive_remote"] as? String ?? "gdrive:"
         screenMode = dict["screen_mode"] as? String ?? "off"
-        screenSystemAudio = dict["screen_system_audio"] as? Bool ?? false
+        screenSystemAudio = dict["screen_system_audio"] as? Bool ?? true
+        captureMicrophone = dict["capture_microphone"] as? Bool ?? true
         screenMaxDimension = dict["screen_max_dimension"] as? Int ?? 2560
         videoFolderInput = dict["video_folder_id"] as? String ?? ""
         videoPublic = dict["video_public"] as? Bool ?? true
@@ -132,6 +137,7 @@ final class ConfigStore: ObservableObject {
         raw["drive_remote"] = driveRemote
         raw["screen_mode"] = screenMode
         raw["screen_system_audio"] = screenSystemAudio
+        raw["capture_microphone"] = captureMicrophone
         raw["screen_max_dimension"] = screenMaxDimension
         raw["video_folder_id"] = ConfigStore.folderID(from: videoFolderInput)
         raw["video_public"] = videoPublic

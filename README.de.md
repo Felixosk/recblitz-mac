@@ -5,7 +5,7 @@ Klick aufs Symbol, sprechen, nochmal klicken. Du bekommst eine Markdown-Notiz
 mit Titel und dem ganzen Transkript, und wenn du willst, ein Google Doc und den
 Drive-Link zum Video in der Zwischenablage.
 
-### ⬇ [RecBlitz 2.0 herunterladen](https://github.com/Felixosk/recblitz-mac/releases/latest/download/RecBlitz.zip)
+### ⬇ [RecBlitz 2.1 herunterladen](https://github.com/Felixosk/recblitz-mac/releases/latest/download/RecBlitz.zip)
 
 Fertige App · 1,8 MB · macOS 14+ (Transkription braucht macOS 26) · Apple Silicon **und** Intel ·
 [ein Befehl beim ersten Start](#variante-a-fertige-app-herunterladen) ·
@@ -32,7 +32,9 @@ eingesperrt.
 RecBlitz erledigt den langweiligen Teil dazwischen:
 
 1. **Ein Klick oder ⌥⌘R** startet eine Sprachnotiz. Für einen Screencast vorher
-   *Bildschirm* oder *Bereich* wählen, dein Mikrofon läuft immer mit.
+   *Bildschirm* oder *Bereich* wählen. *Mikrofon* und *Systemton* sind zwei
+   Schalter, beide standardmäßig an, so kommt bei einem Online-Call auch die
+   andere Seite ins Transkript.
 2. **Apples Spracherkennung transkribiert auf dem Mac** (SpeechAnalyzer,
    macOS 26). Eine Notiz von 25 Sekunden ist in etwa einer halben Sekunde Text,
    für diesen Schritt verlässt nichts den Rechner.
@@ -76,7 +78,8 @@ und schreibt keine Notizen.
 
 - **Sprachnotiz mit einem Klick** aus der Menüleiste, oder mit **⌥⌘R**, ohne etwas zu öffnen
 - **Transkription auf dem Gerät** mit Apples SpeechAnalyzer, Deutsch, Englisch, Spanisch oder automatisch erkannt
-- **Bildschirm- oder Bereichsaufnahme**, das Mikrofon läuft immer mit, Systemton (Video, Musik) optional
+- **Nur Ton, Bildschirm oder Bereich**, jeweils mit zwei Schaltern: *Mikrofon* und *Systemton*, beide standardmäßig an
+- **Calls ohne Video:** *Nur Ton* mit *Systemton* nimmt beide Seiten eines Online-Calls auf und behält kein Video
 - **Webcam-Blase**, rund und verschiebbar, landet mit im Video
 - **Vorlauf, Pause, Neustart, Verwerfen** in einer kleinen Steuerleiste, die nie im Video auftaucht
 - **Bereit-Zustand** vor dem Screencast: Bereich und Webcam platzieren, dann erst aufnehmen
@@ -92,7 +95,7 @@ und schreibt keine Notizen.
 - **macOS 14 (Sonoma) oder neuer** zum Starten
 - **macOS 26 für die eingebaute Transkription.** Auf älteren Systemen nimmt
   RecBlitz [mlx-whisper](https://github.com/ml-explore/mlx-examples) (`pip3 install mlx-whisper`, Apple Silicon)
-- **macOS 15 oder neuer für Bildschirmaufnahmen** (Mikrofon und Bildschirm laufen dort auf einer Uhr und driften nie auseinander)
+- **macOS 15 oder neuer für Bildschirmaufnahmen und Systemton** (Mikrofon und Bildschirm laufen dort auf einer Uhr und driften nie auseinander)
 - Apple Silicon oder Intel, die App wird als Universal Binary gebaut
 - **Xcode Command Line Tools** zum Bauen (einmalig, siehe unten)
 
@@ -181,7 +184,7 @@ Link". Schalte **Video freigeben** aus, wenn nur du die Links öffnen sollst.
 ## Berechtigungen
 
 - **Mikrofon**, bei der ersten Aufnahme.
-- **Bildschirmaufnahme**, beim ersten Screencast. macOS will, dass du sie unter
+- **Bildschirmaufnahme**, beim ersten Screencast und bei der ersten Aufnahme mit *Nur Ton* und *Systemton*, weil macOS den Systemton über diese Berechtigung liefert. macOS will, dass du sie unter
   **Systemeinstellungen → Datenschutz & Sicherheit → Bildschirm- & Systemaudioaufnahme**
   erlaubst und RecBlitz danach neu startest.
 - **Kamera**, nur für die Webcam-Blase.

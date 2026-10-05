@@ -9,8 +9,8 @@ cd "$(dirname "$0")"
 
 APP_NAME="RecBlitz"
 BUNDLE_ID="app.recblitz.RecBlitz"
-VERSION="2.0"
-BUILD_NUMBER="20"
+VERSION="2.1"
+BUILD_NUMBER="21"
 DIST="dist"
 APP="$DIST/$APP_NAME.app"
 

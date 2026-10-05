@@ -404,11 +404,14 @@ struct SettingsPane: View {
                 .font(.system(size: 10)).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Toggle(L.t("Systemton mitnehmen", "Include system audio"), isOn: $config.screenSystemAudio)
+            Toggle(L.t("Mikrofon aufnehmen", "Record microphone"), isOn: $config.captureMicrophone)
+                .font(.system(size: 12))
+                .onChange(of: config.captureMicrophone) { _, _ in config.save() }
+            Toggle(L.t("Systemton aufnehmen", "Record system audio"), isOn: $config.screenSystemAudio)
                 .font(.system(size: 12))
                 .onChange(of: config.screenSystemAudio) { _, _ in config.save() }
-            Text(L.t("Dein Mikrofon läuft immer mit. Systemton nur nötig, wenn im gezeigten Bild Ton läuft.",
-                     "Your mic is always recorded. System audio only matters if the screen plays sound."))
+            Text(L.t("Für Calls beides an: Mikrofon ist deine Stimme, Systemton die andere Seite. Mindestens eins muss an sein. Gilt in allen drei Modi.",
+                     "For calls keep both on: the mic is your voice, system audio is the other side. At least one must be on. Applies to all three modes."))
                 .font(.system(size: 10)).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 

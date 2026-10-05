@@ -52,6 +52,10 @@ public final class ScreenRecorder {
         /// Zusätzlich zum Mikro auch den Systemton aufnehmen (z.B. wenn im
         /// gezeigten Bildschirm ein Video läuft). Default aus.
         public var includeSystemAudio: Bool
+        /// Mikrofon in den Stream hängen. Default an (MeetingBlitz & Co. verlassen
+        /// sich darauf). Ist es aus, muss `includeSystemAudio` an sein, sonst gäbe
+        /// es eine stumme Aufnahme: `start` wirft dann.
+        public var captureMicrophone: Bool
         /// `uniqueID` des gewünschten Mikrofons; nil = Systemstandard.
         public var microphoneDeviceID: String?
         /// Längste Kante des Videos in Pixeln. nil = native Auflösung.
@@ -66,6 +70,7 @@ public final class ScreenRecorder {
 
         public init(scope: CaptureScope,
                     includeSystemAudio: Bool = false,
+                    captureMicrophone: Bool = true,
                     microphoneDeviceID: String? = nil,
                     maxDimension: Int? = 1920,
                     fps: Int = 30,
@@ -73,6 +78,7 @@ public final class ScreenRecorder {
                     includeWindowIDs: [CGWindowID] = []) {
             self.scope = scope
             self.includeSystemAudio = includeSystemAudio
+            self.captureMicrophone = captureMicrophone
             self.microphoneDeviceID = microphoneDeviceID
             self.maxDimension = maxDimension
             self.fps = fps
@@ -149,7 +155,11 @@ public final class ScreenRecorder {
             Self.requestScreenAccess()
             throw RecError.msg("Bildschirmaufnahme muss erlaubt werden. Nach dem Erlauben die App einmal neu starten.")
         }
-        if AVCaptureDevice.authorizationStatus(for: .audio) != .authorized,
+        guard options.captureMicrophone || options.includeSystemAudio else {
+            throw RecError.msg("Mikrofon oder Systemton muss an sein, sonst wäre die Aufnahme stumm.")
+        }
+        if options.captureMicrophone,
+           AVCaptureDevice.authorizationStatus(for: .audio) != .authorized,
            await !AVCaptureDevice.requestAccess(for: .audio) {
             throw RecError.msg("Kein Mikrofon-Zugriff. Systemeinstellungen → Datenschutz → Mikrofon.")
         }
@@ -168,8 +178,8 @@ public final class ScreenRecorder {
         cfg.queueDepth = 6
 
         // Mikro in denselben Stream (siehe Doku oben).
-        cfg.captureMicrophone = true
-        cfg.microphoneCaptureDeviceID = options.microphoneDeviceID
+        cfg.captureMicrophone = options.captureMicrophone
+        if options.captureMicrophone { cfg.microphoneCaptureDeviceID = options.microphoneDeviceID }
 
         // Ausschnitt: sourceRect erwartet Punkte relativ zum Display-Ursprung.
         if case .region(let rect, _) = options.scope { cfg.sourceRect = rect }
@@ -181,12 +191,15 @@ public final class ScreenRecorder {
         let w = try AVWriter(url: url,
                              width: scaled.width,
                              height: scaled.height,
-                             withSystemAudio: options.includeSystemAudio)
+                             withSystemAudio: options.includeSystemAudio,
+                             withMicrophone: options.captureMicrophone)
         writer = w
 
         let s = SCStream(filter: filter, configuration: cfg, delegate: nil)
         try s.addStreamOutput(w, type: .screen, sampleHandlerQueue: sampleQueue)
-        try s.addStreamOutput(w, type: .microphone, sampleHandlerQueue: sampleQueue)
+        if options.captureMicrophone {
+            try s.addStreamOutput(w, type: .microphone, sampleHandlerQueue: sampleQueue)
+        }
         if options.includeSystemAudio {
             try s.addStreamOutput(w, type: .audio, sampleHandlerQueue: sampleQueue)
         }
@@ -331,7 +344,7 @@ public final class ScreenRecorder {
 private final class AVWriter: NSObject, SCStreamOutput, @unchecked Sendable {
     private let writer: AVAssetWriter
     private let videoInput: AVAssetWriterInput
-    private let micInput: AVAssetWriterInput
+    private let micInput: AVAssetWriterInput?
     private let systemInput: AVAssetWriterInput?
     private var sessionStarted = false
 
@@ -360,7 +373,7 @@ private final class AVWriter: NSObject, SCStreamOutput, @unchecked Sendable {
         }
     }
 
-    init(url: URL, width: Int, height: Int, withSystemAudio: Bool) throws {
+    init(url: URL, width: Int, height: Int, withSystemAudio: Bool, withMicrophone: Bool) throws {
         try? FileManager.default.removeItem(at: url)
         writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
 
@@ -389,8 +402,13 @@ private final class AVWriter: NSObject, SCStreamOutput, @unchecked Sendable {
             AVNumberOfChannelsKey: 1,
             AVEncoderBitRateKey: 96_000,
         ]
-        micInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
-        micInput.expectsMediaDataInRealTime = true
+        if withMicrophone {
+            let m = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
+            m.expectsMediaDataInRealTime = true
+            micInput = m
+        } else {
+            micInput = nil
+        }
 
         var sys: AVAssetWriterInput?
         if withSystemAudio {
@@ -405,7 +423,7 @@ private final class AVWriter: NSObject, SCStreamOutput, @unchecked Sendable {
 
         super.init()
         if writer.canAdd(videoInput) { writer.add(videoInput) }
-        if writer.canAdd(micInput) { writer.add(micInput) }
+        if let micInput, writer.canAdd(micInput) { writer.add(micInput) }
         if let sys, writer.canAdd(sys) { writer.add(sys) }
         guard writer.startWriting() else {
             throw ScreenRecorder.RecError.msg("Aufnahme konnte nicht gestartet werden: \(writer.error?.localizedDescription ?? "unbekannt")")
@@ -425,7 +443,7 @@ private final class AVWriter: NSObject, SCStreamOutput, @unchecked Sendable {
             if let systemInput { append(sampleBuffer, to: systemInput, mayStartSession: false) }
         default:
             if #available(macOS 15.0, *), type == .microphone {
-                append(sampleBuffer, to: micInput, mayStartSession: false)
+                if let micInput { append(sampleBuffer, to: micInput, mayStartSession: false) }
             }
         }
     }
@@ -498,7 +516,7 @@ private final class AVWriter: NSObject, SCStreamOutput, @unchecked Sendable {
     func finish() async {
         guard writer.status == .writing else { return }
         videoInput.markAsFinished()
-        micInput.markAsFinished()
+        micInput?.markAsFinished()
         systemInput?.markAsFinished()
         await writer.finishWriting()
     }

@@ -103,16 +103,16 @@ struct RecPanelView: View {
          .init(id: "auto", label: "Auto", help: L.t("Sprache automatisch erkennen", "Detect the language automatically"))]
     }
 
-    /// Das Mikro läuft in JEDEM Modus mit. Der Sinn eines Screencasts ist, dass
-    /// man erklärt, was man zeigt, und das Transkript danach aus der eigenen
-    /// Stimme entsteht (Anforderung 31.07.).
+    /// Mikrofon und Systemton sind in JEDEM Modus wählbar (beide Default an), damit
+    /// bei einem Call nie nur eine Seite aufgenommen wird (05.10.).
     private var modeItems: [PillSegment<String>.Item] {
-        [.init(id: "off", label: L.t("Nur Ton", "Audio"), icon: "mic.fill",
-               help: L.t("Nur das Mikrofon, die schnelle Sprachnotiz", "Microphone only, the quick voice note")),
-         .init(id: "screen", label: L.t("Bildschirm", "Screen"), icon: "display",
-               help: L.t("Ganzer Bildschirm plus Mikrofon", "Whole screen plus microphone")),
-         .init(id: "region", label: L.t("Bereich", "Region"), icon: "crop",
-               help: L.t("Einen Ausschnitt aufziehen, plus Mikrofon", "Drag out a region, plus microphone"))]
+        [.init(id: "off", label: L.t("Nur Ton", "Audio only"),
+               help: L.t("Nur Ton, kein Video: die schnelle Sprachnotiz, auch für Calls",
+                         "Sound only, no video: the quick voice note, also for calls")),
+         .init(id: "screen", label: L.t("Bildschirm", "Screen"),
+               help: L.t("Ganzer Bildschirm mit Ton", "Whole screen with sound")),
+         .init(id: "region", label: L.t("Bereich", "Region"),
+               help: L.t("Einen Ausschnitt aufziehen, mit Ton", "Drag out a region, with sound"))]
     }
 
     private var options: some View {
@@ -146,19 +146,27 @@ struct RecPanelView: View {
             // Systemton und Webcam betreffen nur den Bildschirm. Die Webcam-
             // Zeile bleibt aber sichtbar, solange die Blase an ist, sonst ließe
             // sie sich nach dem Wechsel auf „Nur Ton" hier nicht mehr abschalten.
-            if config.screenMode != "off" || config.webcamEnabled {
-                optionRow("") {
-                    HStack(spacing: 6) {
-                        if config.screenMode != "off" {
-                            ChipToggle(icon: "speaker.wave.2.fill", offIcon: "speaker.slash",
-                                       label: L.t("Systemton", "System audio"),
-                                       isOn: config.screenSystemAudio, disabled: locked,
-                                       help: L.t("Nimmt zusätzlich auf, was der Mac abspielt (Videos, Musik)",
-                                                 "Also records what the Mac plays (videos, music)")) {
-                                config.screenSystemAudio.toggle()
-                                config.save()
-                            }
-                        }
+            optionRow("") {
+                HStack(spacing: 6) {
+                    ChipToggle(icon: "mic.fill", offIcon: "mic.slash",
+                               label: L.t("Mikro", "Mic"),
+                               isOn: config.captureMicrophone, disabled: locked,
+                               help: L.t("Deine Stimme", "Your voice")) {
+                        config.captureMicrophone.toggle()
+                        config.save()
+                    }
+                    ChipToggle(icon: "speaker.wave.2.fill", offIcon: "speaker.slash",
+                               label: L.t("Systemton", "System"),
+                               isOn: config.screenSystemAudio, disabled: locked,
+                               help: L.t("Was der Mac abspielt: die andere Seite im Call, Videos, Musik",
+                                         "What the Mac plays: the other side of a call, videos, music")) {
+                        config.screenSystemAudio.toggle()
+                        config.save()
+                    }
+                    // Webcam nur bei Bildschirm/Bereich. Bleibt sichtbar, solange die
+                    // Blase an ist, sonst ließe sie sich nach dem Wechsel auf „Nur Ton"
+                    // hier nicht mehr abschalten.
+                    if config.screenMode != "off" || config.webcamEnabled {
                         ChipToggle(icon: "person.crop.circle.fill", offIcon: "person.crop.circle",
                                    label: "Webcam", isOn: config.webcamEnabled, disabled: locked,
                                    help: L.t("Runde Kamerablase, landet mit im Video und lässt sich verschieben",
@@ -166,8 +174,16 @@ struct RecPanelView: View {
                             config.webcamEnabled.toggle()
                             config.save()
                         }
-                        Spacer(minLength: 0)
                     }
+                    Spacer(minLength: 0)
+                }
+            }
+            if !config.captureMicrophone && !config.screenSystemAudio {
+                optionRow("") {
+                    Text(L.t("Mikrofon oder Systemton einschalten", "Turn on microphone or system audio"))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.red)
+                    Spacer(minLength: 0)
                 }
             }
         }

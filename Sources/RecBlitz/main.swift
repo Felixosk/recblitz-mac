@@ -28,6 +28,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let screenRecorder = ScreenRecorder()
     /// Läuft die aktuelle Aufnahme über den Bildschirm-Pfad?
     private var screenRecordingActive = false
+    /// „Nur Ton" mit Systemton läuft über die Bildschirm-Engine (nur sie kann den
+    /// Systemton), das Video ist dabei winzig und wird nach dem Ton-Ausziehen
+    /// gelöscht, nie hochgeladen (05.10.).
+    private var audioOnlyViaScreen = false
+    /// Hatte die laufende Bildschirm-Aufnahme Mikro UND Systemton (= zwei Spuren)?
+    private var recordedTwoAudioTracks = false
     /// Video der gerade verarbeiteten Aufnahme; wird an pipeline.py durchgereicht,
     /// die es nach Drive lädt und den Link in Doc + Obsidian schreibt.
     private var pendingVideoURL: URL?
@@ -227,9 +233,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func startRecording() {
         guard !recorder.isRecording, !screenRecordingActive, phase != .armed else { return }
-        let mode = ConfigStore.shared.screenMode
+        let cfg = ConfigStore.shared
+        // Nie eine stumme Aufnahme: ohne Mikro UND ohne Systemton gar nicht erst starten.
+        guard cfg.captureMicrophone || cfg.screenSystemAudio else {
+            Banner.show(title: L.t("Mikrofon oder Systemton einschalten", "Turn on microphone or system audio"),
+                        subtitle: L.t("Beide sind aus, die Aufnahme wäre stumm.",
+                                      "Both are off, the recording would be silent."),
+                        url: nil, isError: true)
+            return
+        }
+        let mode = cfg.screenMode
         if mode != "off" {
             startScreenRecording(mode: mode)
+            return
+        }
+        if cfg.screenSystemAudio {
+            // Kein Region-Picker, keine Leiste, kein Vorlauf: fühlt sich an wie
+            // die normale Sprachnotiz und startet sofort.
+            let chosen = cfg.screenDisplayID
+            startCapture(scope: .fullScreen(displayID: chosen > 0 ? CGDirectDisplayID(chosen) : nil),
+                         audioOnly: true)
             return
         }
         startMicRecording()
@@ -377,26 +400,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func startCapture(scope: CaptureScope) {
+    private func startCapture(scope: CaptureScope, audioOnly: Bool = false) {
         // Eigener Guard: seit es den Play-Knopf gibt, ist startRecording() nicht
         // mehr der einzige Weg hierher. Ohne das könnten zwei Recorder parallel
         // laufen und die App danach dauerhaft blockieren.
         guard !recorder.isRecording, !screenRecordingActive else { return }
         let cfg = ConfigStore.shared
+        guard cfg.captureMicrophone || cfg.screenSystemAudio else {
+            cancelArmed()
+            Banner.show(title: L.t("Mikrofon oder Systemton einschalten", "Turn on microphone or system audio"),
+                        subtitle: L.t("Beide sind aus, die Aufnahme wäre stumm.",
+                                      "Both are off, the recording would be silent."),
+                        url: nil, isError: true)
+            return
+        }
         let df = DateFormatter()
         df.dateFormat = "yyyyMMdd_HHmmss"
-        let url = Recorder.recordingsDir.appendingPathComponent("screen_\(df.string(from: Date())).mp4")
+        let url = Recorder.recordingsDir.appendingPathComponent(
+            "\(audioOnly ? "audio" : "screen")_\(df.string(from: Date())).mp4")
 
         let opts = ScreenRecorder.Options(
             scope: scope,
             includeSystemAudio: cfg.screenSystemAudio,
+            captureMicrophone: cfg.captureMicrophone,
             // Die Mikrofon-Auswahl aus den Einstellungen gilt auch hier.
             microphoneDeviceID: Recorder.currentMic()?.uniqueID,
-            maxDimension: cfg.screenMaxDimension > 0 ? cfg.screenMaxDimension : nil,
-            fps: 30,
+            maxDimension: audioOnly ? 320 : (cfg.screenMaxDimension > 0 ? cfg.screenMaxDimension : nil),
+            fps: audioOnly ? 1 : 30,
             // Die Blase gehört uns und wäre sonst mit ausgeschlossen — sie soll
             // aber gerade zu sehen sein.
-            includeWindowIDs: MainActor.assumeIsolated {
+            includeWindowIDs: audioOnly ? [] : MainActor.assumeIsolated {
                 WebcamBubble.shared.windowID.map { [$0] } ?? []
             })
 
@@ -404,6 +437,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             do {
                 try await screenRecorder.start(to: url, options: opts)
                 screenRecordingActive = true
+                audioOnlyViaScreen = audioOnly
+                recordedTwoAudioTracks = opts.captureMicrophone && opts.includeSystemAudio
                 activeScope = scope
                 phase = .recording
                 state.elapsed = 0
@@ -411,7 +446,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 timer?.invalidate()          // alten Ticker nie doppelt laufen lassen
                 // Leiste NICHT neu aufbauen: sie steht schon und wurde
                 // vielleicht verschoben. Nur den Zustand umschalten.
-                if RecordingControlBar.shared.isVisible {
+                if audioOnly {
+                    // keine Leiste: „Nur Ton" bleibt unsichtbar wie die Sprachnotiz
+                } else if RecordingControlBar.shared.isVisible {
                     RecordingControlBar.shared.setArmed(false)
                 } else {
                     showControlBar(for: scope)
@@ -419,15 +456,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
                     guard let self else { return }
                     self.state.elapsed = Int(self.screenRecorder.elapsed)
-                    MainActor.assumeIsolated {
-                        RecordingControlBar.shared.update(elapsed: self.screenRecorder.elapsed,
-                                                          paused: self.screenRecorder.isPaused)
+                    if !self.audioOnlyViaScreen {
+                        MainActor.assumeIsolated {
+                            RecordingControlBar.shared.update(elapsed: self.screenRecorder.elapsed,
+                                                              paused: self.screenRecorder.isPaused)
+                        }
                     }
                     self.render()
                 }
             } catch {
-                Banner.show(title: L.t("Bildschirmaufnahme fehlgeschlagen", "Screen recording failed"),
-                            subtitle: error.localizedDescription, url: nil, isError: true)
+                Banner.show(title: audioOnly ? L.t("Systemton-Aufnahme fehlgeschlagen", "System audio recording failed")
+                                             : L.t("Bildschirmaufnahme fehlgeschlagen", "Screen recording failed"),
+                            subtitle: error.localizedDescription
+                                + (audioOnly ? "\n" + L.t("Systemton braucht die Bildschirmaufnahme-Erlaubnis. Oder Systemton ausschalten, dann läuft nur das Mikrofon.",
+                                                          "System audio needs the screen recording permission. Or turn system audio off to record the mic only.") : ""),
+                            url: nil, isError: true)
                 RecordingControlBar.shared.hide()
                 activeScope = nil
                 phase = uploadsInFlight > 0 ? .uploading : .idle
@@ -440,6 +483,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// zusätzliches Argument mit, damit die Pipeline es nach Drive lädt.
     private func stopScreenRecording() {
         Task { @MainActor in
+            let audioOnly = audioOnlyViaScreen
+            audioOnlyViaScreen = false
             guard let (videoURL, seconds) = await screenRecorder.stop() else {
                 screenRecordingActive = false
                 phase = .idle
@@ -456,7 +501,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Mit Systemton entstehen ZWEI Tonspuren (Mikro + System). Player
             // spielen meist nur die erste — vor allem die Drive-Vorschau. Also
             // vor dem Weiterreichen auf eine Spur mischen.
-            if ConfigStore.shared.screenSystemAudio {
+            if recordedTwoAudioTracks {
                 if !AudioMixdown.mixToSingleTrack(at: videoURL) {
                     NSLog("RecBlitz: Tonspuren nicht gemischt (ffmpeg fehlt?), Video hat zwei Spuren")
                 }
@@ -465,7 +510,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let audioURL = videoURL.deletingPathExtension().appendingPathExtension("m4a")
             do {
                 try await AudioExtractor.extractAudio(from: videoURL, to: audioURL)
-                pendingVideoURL = videoURL
+                if audioOnly {
+                    // „Nur Ton": das Mini-Video war nur Mittel zum Zweck. Weg damit,
+                    // kein Upload (pendingVideoURL bleibt leer).
+                    try? FileManager.default.removeItem(at: videoURL)
+                } else {
+                    pendingVideoURL = videoURL
+                }
                 handleRecordingFinished(url: audioURL, seconds: seconds)
             } catch {
                 // Ohne Ton kein Transkript — das Video ist trotzdem da, also nicht
@@ -599,6 +650,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { @MainActor in
                 let result = await screenRecorder.stop()
                 screenRecordingActive = false
+                audioOnlyViaScreen = false
                 if let (url, _) = result { try? FileManager.default.removeItem(at: url) }
                 discarding = false
                 phase = uploadsInFlight > 0 ? .uploading : .idle
@@ -974,6 +1026,46 @@ if cliArgs.count >= 2, cliArgs[1] == "--selftest" {
     }
     for f in failures { print("FAIL: \(f)") }
     exit(1)
+}
+
+// Engine-Test ohne UI: `--test-audio-only <out.m4a> <sekunden> <mic:0|1> <system:0|1>`
+// nimmt über denselben Pfad wie „Nur Ton" auf (Mini-Video, mixdown, Ton ausziehen,
+// Video löschen) und schreibt das Ergebnis nach <out.m4a>. Log: <out.m4a>.log
+if cliArgs.count >= 6, cliArgs[1] == "--test-audio-only" {
+    let out = URL(fileURLWithPath: cliArgs[2])
+    let secs = Double(cliArgs[3]) ?? 8
+    let mic = cliArgs[4] == "1", sys = cliArgs[5] == "1"
+    func log(_ m: String) {
+        let line = m + "\n"
+        if let h = try? FileHandle(forWritingTo: URL(fileURLWithPath: out.path + ".log")) {
+            h.seekToEndOfFile(); h.write(line.data(using: .utf8)!); try? h.close()
+        } else { try? line.write(toFile: out.path + ".log", atomically: true, encoding: .utf8) }
+    }
+    try? FileManager.default.removeItem(atPath: out.path + ".log")
+    Task { @MainActor in
+        let rec = ScreenRecorder()
+        let video = out.deletingPathExtension().appendingPathExtension("mp4")
+        do {
+            try await rec.start(to: video, options: ScreenRecorder.Options(
+                scope: .fullScreen(displayID: nil), includeSystemAudio: sys, captureMicrophone: mic,
+                microphoneDeviceID: Recorder.currentMic()?.uniqueID, maxDimension: 320, fps: 1))
+            log("started")
+            try await Task.sleep(nanoseconds: UInt64(secs * 1_000_000_000))
+            guard let (v, d) = await rec.stop() else { log("ERROR stop nil"); exit(1) }
+            log("stopped \(d)s video=\(AudioExtractor.fileSize(v))B")
+            if mic && sys { log("mix=\(AudioMixdown.mixToSingleTrack(at: v))") }
+            try await AudioExtractor.extractAudio(from: v, to: out)
+            try? FileManager.default.removeItem(at: v)
+            log("DONE m4a=\(AudioExtractor.fileSize(out))B videoLeft=\(FileManager.default.fileExists(atPath: v.path))")
+            exit(0)
+        } catch {
+            log("ERROR \(error.localizedDescription)")
+            exit(1)
+        }
+    }
+    let a = NSApplication.shared
+    a.setActivationPolicy(.accessory)
+    a.run()
 }
 
 if cliArgs.count >= 3, cliArgs[1] == "--transcribe" {

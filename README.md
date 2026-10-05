@@ -5,7 +5,7 @@ Click the icon, talk, click again. You get a titled Markdown note with the full
 transcript, and if you want, a Google Doc and a Drive link to the video on your
 clipboard.
 
-### ⬇ [Download RecBlitz 2.0](https://github.com/Felixosk/recblitz-mac/releases/latest/download/RecBlitz.zip)
+### ⬇ [Download RecBlitz 2.1](https://github.com/Felixosk/recblitz-mac/releases/latest/download/RecBlitz.zip)
 
 Ready-made app · 1.8 MB · macOS 14+ (transcription needs macOS 26) · Apple Silicon **and** Intel ·
 [one extra command on first launch](#option-a-download-the-ready-made-app) ·
@@ -31,7 +31,8 @@ and the words stay locked inside it.
 RecBlitz does the boring part in between:
 
 1. **One click or ⌥⌘R** starts a voice note. For a screencast pick *Screen* or
-   *Region* first, your microphone always runs along.
+   *Region* first. *Mic* and *System* are two switches, both on by default, so
+   an online call is transcribed with both sides.
 2. **Apple's speech recognition transcribes it on the Mac** (SpeechAnalyzer,
    macOS 26). A 25 second note is text in about half a second, nothing leaves
    the machine for that step.
@@ -74,7 +75,8 @@ account and does not write notes.
 
 - **Voice note in one click** from the menu bar, or with **⌥⌘R** without opening anything
 - **On-device transcription** with Apple's SpeechAnalyzer, German, English, Spanish or automatic detection
-- **Screen or region recording** with your microphone always on, optional system audio (a video, music)
+- **Audio only, screen or region**, each with two switches: *Mic* and *System* sound, both on by default
+- **Calls without a video:** *Audio only* with *System* on records both sides of an online call and keeps no video
 - **Webcam bubble**, round and draggable, recorded into the video
 - **Countdown, pause, restart, discard** in a small control bar that never shows up in the recording
 - **Ready state** before a screencast: place the region and the webcam, then press record
@@ -90,7 +92,7 @@ account and does not write notes.
 - **macOS 14 (Sonoma) or newer** to run
 - **macOS 26 for the built-in transcription.** On older systems RecBlitz falls back
   to [mlx-whisper](https://github.com/ml-explore/mlx-examples) (`pip3 install mlx-whisper`, Apple Silicon)
-- **macOS 15 or newer for screen recording** (microphone and screen share one clock there, so they never drift apart)
+- **macOS 15 or newer for screen recording and for system sound** (microphone and screen share one clock there, so they never drift apart)
 - Apple Silicon or Intel, the app builds as a universal binary
 - **Xcode Command Line Tools** to build (one-time, see below)
 
@@ -178,7 +180,7 @@ off **Share video** if you want links that only you can open.
 ## Permissions
 
 - **Microphone**, asked on the first recording.
-- **Screen recording**, asked on the first screencast. macOS wants you to allow
+- **Screen recording**, asked on the first screencast, and on the first *Audio only* recording with *System* on, because macOS delivers system sound through that permission. macOS wants you to allow
   it under **System Settings → Privacy & Security → Screen & System Audio
   Recording**, then restart RecBlitz.
 - **Camera**, only for the webcam bubble.
