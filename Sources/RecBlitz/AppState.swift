@@ -9,6 +9,9 @@ struct LastResult: Codable, Equatable {
     var docURL: URL?
     var videoURL: URL?
     var markdownPath: String?
+    /// Originalvideo auf dieser Platte (~/Movies/RecBlitz), auch wenn videoURL
+    /// ein Drive-Link ist. Optional, damit alte last_result.json lesbar bleiben.
+    var localVideoPath: String?
 
     static var fileURL: URL {
         URL(fileURLWithPath: PipelineRunner.supportDir).appendingPathComponent("last_result.json")

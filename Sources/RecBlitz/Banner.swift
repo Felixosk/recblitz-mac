@@ -63,7 +63,7 @@ extension Color {
     }
 }
 
-private struct BannerView: View {
+struct BannerView: View {
     let title: String
     let subtitle: String
     let isError: Bool
@@ -76,7 +76,7 @@ private struct BannerView: View {
         HStack(alignment: .top, spacing: 11) {
             Image(systemName: isError ? "exclamationmark.triangle.fill" : "waveform")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(isError ? Color(hex: 0xF0A93B) : Color(hex: 0x8EE6C8))
+                .foregroundStyle(isError ? Color(hex: 0xF0A93B) : Theme.bannerIcon)
                 .frame(width: 30, height: 30)
                 .background(Circle().fill(Color.black.opacity(0.22)))
             VStack(alignment: .leading, spacing: 3) {
@@ -86,16 +86,16 @@ private struct BannerView: View {
                     .shadow(color: .black.opacity(0.35), radius: 1.5, y: 0.5)
                 Text(subtitle)
                     .font(.system(size: 11.5))
-                    .foregroundStyle(Color(hex: 0xEAF6F2))
+                    .foregroundStyle(Theme.bannerText)
                     .lineLimit(4)
                     .fixedSize(horizontal: false, vertical: true)
                 if let hint, !hint.isEmpty {
                     Text(hint).font(.system(size: 10.5))
-                        .foregroundStyle(Color(hex: 0xEAF6F2).opacity(0.7))
+                        .foregroundStyle(Theme.bannerText.opacity(0.7))
                 } else if !isError, hasLink {
                     Text(L.t("Klick öffnet das Ergebnis", "Click to open the result"))
                         .font(.system(size: 10.5))
-                        .foregroundStyle(Color(hex: 0xEAF6F2).opacity(0.7))
+                        .foregroundStyle(Theme.bannerText.opacity(0.7))
                 }
             }
             .contentShape(Rectangle())
@@ -110,14 +110,15 @@ private struct BannerView: View {
             // ein dunkles Schiefer statt Türkis, damit man sie nicht mit einer
             // Erfolgsmeldung verwechselt.
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(LinearGradient(
-                    colors: isError ? [Color(hex: 0x3A4658), Color(hex: 0x1B2230)]
-                                    : [Color(hex: 0x18A9B4), Color(hex: 0x0A4E58)],
-                    startPoint: .topLeading, endPoint: .bottomTrailing))
+                .fill(isError
+                      ? AnyShapeStyle(LinearGradient(colors: [Color(hex: 0x3A4658), Color(hex: 0x1B2230)],
+                                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+                      : AnyShapeStyle(LinearGradient(gradient: Theme.bannerGradient,
+                                                     startPoint: .leading, endPoint: .trailing)))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color(hex: isError ? 0xF0A93B : 0x2EC7A0).opacity(0.30), lineWidth: 1)
+                .strokeBorder((isError ? Color(hex: 0xF0A93B) : Theme.bannerRim).opacity(0.30), lineWidth: 1)
         )
         // × sitzt AUF der Ecke und ragt leicht heraus, wie bei den macOS-
         // Mitteilungen (Rückmeldung 31.07.). Dunkle Scheibe, weißes Kreuz, wie

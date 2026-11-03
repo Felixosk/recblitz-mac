@@ -82,7 +82,7 @@ struct RecPanelView: View {
         case .transcribing:
             Text(L.t("Transkribiert …", "Transcribing …"))
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Theme.accent)
         default:
             Text("⌥⌘R")
                 .font(.system(size: 10.5, weight: .semibold))
@@ -148,13 +148,15 @@ struct RecPanelView: View {
             // sie sich nach dem Wechsel auf „Nur Ton" hier nicht mehr abschalten.
             optionRow("") {
                 HStack(spacing: 6) {
+                    // Ein Knopf: Klick (und Rechtsklick) oeffnet das Geraete-Menue,
+                    // dort steht auch "Mikrofon aufnehmen" zum Ein-/Ausschalten.
                     ChipToggle(icon: "mic.fill", offIcon: "mic.slash",
                                label: L.t("Mikro", "Mic"),
-                               isOn: config.captureMicrophone, disabled: locked,
-                               help: L.t("Deine Stimme", "Your voice")) {
-                        config.captureMicrophone.toggle()
-                        config.save()
+                               isOn: config.captureMicrophone, disabled: locked, chevron: true,
+                               help: L.t("Mikrofon wählen oder ein-/ausschalten", "Choose or toggle the microphone")) {
+                        MicMenu.shared.show()
                     }
+                    .overlay(RightClickCatcher { MicMenu.shared.show() })
                     ChipToggle(icon: "speaker.wave.2.fill", offIcon: "speaker.slash",
                                label: L.t("Systemton", "System"),
                                isOn: config.screenSystemAudio, disabled: locked,
@@ -243,7 +245,7 @@ struct RecPanelView: View {
             PanelController.shared.close()
         } label: {
             ActionPill(title: title, icon: icon,
-                       tint: (recording || armed) ? .red : .accentColor,
+                       tint: (recording || armed) ? .red : Theme.accent,
                        hovered: mainHovered, dimmed: transcribing)
         }
         .buttonStyle(.plain)
@@ -265,14 +267,14 @@ struct RecPanelView: View {
                 if let pct = state.uploadProgress {
                     Text("\(pct) %")
                         .font(.system(size: 11, weight: .semibold).monospacedDigit())
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(Color.primary)
                 }
             }
             if let pct = state.uploadProgress {
                 GeometryReader { g in
                     ZStack(alignment: .leading) {
                         Capsule().fill(Color.primary.opacity(0.08))
-                        Capsule().fill(Color.accentColor)
+                        Capsule().fill(Theme.accent)
                             .frame(width: max(4, g.size.width * CGFloat(pct) / 100))
                     }
                 }
@@ -318,9 +320,9 @@ struct RecPanelView: View {
             Label(drive != nil ? "Drive" : L.t("Ordner", "Folder"),
                   systemImage: drive != nil ? "externaldrive" : "folder")
                 .font(.system(size: 10.5, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Color.primary.opacity(0.85))
                 .padding(.horizontal, 6).padding(.vertical, 2)
-                .background(RoundedRectangle(cornerRadius: 5).fill(Color.accentColor.opacity(0.13)))
+                .background(RoundedRectangle(cornerRadius: 5).fill(Color.primary.opacity(0.10)))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -375,7 +377,7 @@ struct LastRow: View {
         HStack(spacing: 8) {
             Image(systemName: result.videoURL != nil ? "play.rectangle.fill" : "waveform")
                 .font(.system(size: 10.5, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(Theme.accent)
                 .frame(width: 14)
             Text(timeLabel)
                 .font(.system(size: 12, weight: .medium).monospacedDigit())
@@ -399,6 +401,16 @@ struct LastRow: View {
                     else { pb.setString(video.absoluteString, forType: .string) }
                 }
             }
+            if let local = result.localVideoPath {
+                RowIconButton(icon: "film", help: L.t("Video: zeigt das Originalvideo im Finder",
+                                                      "Video: shows the original video in Finder")) {
+                    if FileManager.default.fileExists(atPath: local) {
+                        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: local)])
+                    } else {
+                        NSWorkspace.shared.open(Recorder.moviesDir)   // verschoben: Ordner zeigen
+                    }
+                }
+            }
             if let transcript, !transcript.isEmpty {
                 RowIconButton(icon: "doc.on.doc", help: L.t("Kopiert das ganze Transkript",
                                                            "Copies the full transcript"),
@@ -419,7 +431,7 @@ struct LastRow: View {
         }
         .padding(.horizontal, 6).padding(.vertical, 5)
         .background(RoundedRectangle(cornerRadius: 6)
-            .fill(hovering ? Color.primary.opacity(0.08) : Color.accentColor.opacity(0.10)))
+            .fill(hovering ? Color.primary.opacity(0.08) : Theme.accent.opacity(0.10)))
         .contentShape(Rectangle())
         .onTapGesture { if let url = primaryURL { NSWorkspace.shared.open(url) } }
         .onHover { hovering = $0 }

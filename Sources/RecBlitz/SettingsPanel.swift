@@ -228,7 +228,7 @@ struct SettingsPane: View {
                                          : hoveredTab == t.id ? Color.primary : Color.secondary)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
-                                .fill(tab == t.id ? Color.accentColor
+                                .fill(tab == t.id ? Theme.accent
                                       : hoveredTab == t.id ? Color.primary.opacity(0.10) : .clear)
                         )
                         .contentShape(RoundedRectangle(cornerRadius: 6))
@@ -473,12 +473,8 @@ struct SettingsPane: View {
                        isOn: $config.videoPublic)
                     .font(.system(size: 12))
                     .onChange(of: config.videoPublic) { _, _ in config.save() }
-                Toggle(L.t("Lokales Video nach Upload löschen", "Delete local video after upload"),
-                       isOn: $config.deleteLocalAfterUpload)
-                    .font(.system(size: 12))
-                    .onChange(of: config.deleteLocalAfterUpload) { _, _ in config.save() }
-                Text(L.t("Gelöscht wird erst, wenn der Drive-Link wirklich da ist.",
-                         "Only deleted once the Drive link really exists."))
+                Text(L.t("Das Originalvideo bleibt immer lokal in ~/Movies/RecBlitz und wird nie automatisch gelöscht.",
+                         "The original video always stays local in ~/Movies/RecBlitz and is never deleted automatically."))
                     .font(.system(size: 10)).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -506,7 +502,7 @@ struct SettingsPane: View {
             HStack(spacing: 6) {
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 11))
-                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+                    .foregroundStyle(selected ? Theme.accent : Color.secondary)
                 Text(name).font(.system(size: 12)).lineLimit(1)
                 Spacer()
             }

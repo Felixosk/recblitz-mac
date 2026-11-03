@@ -45,7 +45,7 @@ struct PillSegment<ID: Hashable>: View {
                                      : hovered == item.id ? Color.primary : Color.secondary)
                     .background(
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(on ? Color.accentColor
+                            .fill(on ? Theme.accent
                                   : hovered == item.id ? Color.primary.opacity(0.10) : .clear)
                     )
                     .contentShape(RoundedRectangle(cornerRadius: 6))
@@ -68,7 +68,7 @@ struct PillSegment<ID: Hashable>: View {
 struct ActionPill: View {
     let title: String
     let icon: String
-    var tint: Color = .accentColor
+    var tint: Color = Theme.accent
     var hovered = false
     var dimmed = false
 
@@ -120,7 +120,7 @@ struct SquarePill: View {
                 .padding(.vertical, 7)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(active ? Color.accentColor
+                        .fill(active ? Theme.accent
                               : Color.primary.opacity(hovered ? 0.15 : 0.09))
                 )
                 .overlay(RoundedRectangle(cornerRadius: 8)
@@ -141,6 +141,7 @@ struct ChipToggle: View {
     let label: String
     let isOn: Bool
     var disabled = false
+    var chevron = false
     let help: String
     let action: () -> Void
     @State private var hovered = false
@@ -151,11 +152,16 @@ struct ChipToggle: View {
                 Image(systemName: isOn ? icon : offIcon)
                     .font(.system(size: 10, weight: .semibold))
                 Text(label).font(.system(size: 11, weight: isOn ? .semibold : .medium)).lineLimit(1).fixedSize()
+                if chevron {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 7.5, weight: .bold))
+                        .opacity(0.75)
+                }
             }
-            .foregroundStyle(isOn ? Color.accentColor : hovered ? Color.primary : Color.secondary)
+            .foregroundStyle(isOn ? Theme.accent : hovered ? Color.primary : Color.secondary)
             .padding(.horizontal, 6).padding(.vertical, 4)
             .background(RoundedRectangle(cornerRadius: 6)
-                .fill(isOn ? Color.accentColor.opacity(0.15)
+                .fill(isOn ? Theme.accent.opacity(0.15)
                       : Color.primary.opacity(hovered ? 0.10 : 0.06)))
             .contentShape(RoundedRectangle(cornerRadius: 6))
         }
@@ -246,4 +252,25 @@ struct SectionLabel: View {
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(.secondary)
     }
+}
+
+/// Zentrale Farben, IDENTISCH zu MeetingBlitz (03.11., Korrektur): Akzent ist die
+/// System-Akzentfarbe (`Color.accentColor`), genau wie in MeetingBlitz fuer
+/// Start-Knopf, Chips, Balken. Der Banner nutzt MeetingBlitz' Ozean-Verlauf
+/// (BannerContent.swift: 0x2F80F0 nach 0x1650B8, Rand 0x7DB4FF). Nur an EINER
+/// Stelle definiert, damit RecBlitz nicht wieder eine eigene Farbe bekommt.
+/// Text steht NICHT in der Akzentfarbe, wo Dunkelblau auf Dunkelgrau unlesbar
+/// war (Prozentzahl, Drive-Pille): dort weiss bzw. hellgrau.
+enum Theme {
+    static let accent = Color.accentColor
+    static let accentNS = NSColor.controlAccentColor
+    /// Horizontal von links (hell, hinter dem Motiv) nach rechts (dunkel, hinter dem weissen Knopf).
+    static let bannerGradient = Gradient(stops: [
+        .init(color: Color(hex: 0x3D8CF5), location: 0.0),
+        .init(color: Color(hex: 0x2F80F0), location: 0.22),
+        .init(color: Color(hex: 0x0F3A8F), location: 0.70),
+        .init(color: Color(hex: 0x0B2A6B), location: 1.0)])
+    static let bannerRim = Color(hex: 0x7DB4FF)
+    static let bannerIcon = Color.white
+    static let bannerText = Color(hex: 0xE6F0FF)
 }

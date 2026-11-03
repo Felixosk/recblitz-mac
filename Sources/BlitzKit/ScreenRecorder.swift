@@ -176,6 +176,14 @@ public final class ScreenRecorder {
         cfg.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(max(1, options.fps)))
         cfg.showsCursor = true
         cfg.queueDepth = 6
+        // 03.11.: ohne diese Zeilen entscheidet macOS selbst ("automatic") und
+        // liefert bei Bereichen/externen Monitoren teils nur Punkt- statt
+        // Pixelgroesse. .best = native Pixel, Pixelformat NV12 spart Bandbreite
+        // und bleibt fuer Text scharf genug (kein BGRA-Umweg noetig).
+        if #available(macOS 14.0, *) { cfg.captureResolution = .best }
+        cfg.scalesToFit = false
+        cfg.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+        cfg.colorSpaceName = CGColorSpace.sRGB
 
         // Mikro in denselben Stream (siehe Doku oben).
         cfg.captureMicrophone = options.captureMicrophone
@@ -184,7 +192,19 @@ public final class ScreenRecorder {
         // Ausschnitt: sourceRect erwartet Punkte relativ zum Display-Ursprung.
         if case .region(let rect, _) = options.scope { cfg.sourceRect = rect }
 
-        let scaled = Self.scaled(pixelSize, maxDimension: options.maxDimension)
+        // 03.11.: Nicht-Retina-Quellen (z.B. ein 1080p-Monitor) liefern fuer einen
+        // 1000x600-Bereich nur 1000x600 Pixel. Das Video ist dann "nicht mal HD",
+        // Drive/YouTube transkodieren es in eine niedrige Stufe, und Player
+        // vergroessern es grob. Deshalb ganzzahlig auf das Doppelte hochskalieren,
+        // solange die laengste Kante unter 1920 liegt. Schaerfer als der Quelle
+        // wird es dadurch nicht, aber es bleibt in der HD-Stufe und wird weich
+        // statt klotzig vergroessert.
+        var targetSize = pixelSize
+        if max(pixelSize.width, pixelSize.height) < 1920 {
+            targetSize = CGSize(width: pixelSize.width * 2, height: pixelSize.height * 2)
+            cfg.scalesToFit = true
+        }
+        let scaled = Self.scaled(targetSize, maxDimension: options.maxDimension)
         cfg.width = scaled.width
         cfg.height = scaled.height
 
@@ -347,6 +367,7 @@ private final class AVWriter: NSObject, SCStreamOutput, @unchecked Sendable {
     private let micInput: AVAssetWriterInput?
     private let systemInput: AVAssetWriterInput?
     private var sessionStarted = false
+    private var lastPTS: CMTime = .invalid
 
     // MARK: Pause (01.08.)
     //
@@ -381,6 +402,11 @@ private final class AVWriter: NSObject, SCStreamOutput, @unchecked Sendable {
             AVVideoCodecKey: AVVideoCodecType.h264,
             AVVideoWidthKey: width,
             AVVideoHeightKey: height,
+            AVVideoColorPropertiesKey: [
+                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
+                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
+            ],
             // AVVideoProfileLevelKey MUSS in die CompressionProperties, auf der
             // obersten Ebene wirft AVAssetWriter eine NSException.
             AVVideoCompressionPropertiesKey: [
@@ -389,7 +415,11 @@ private final class AVWriter: NSObject, SCStreamOutput, @unchecked Sendable {
                 // Encoder verbraucht das Budget ohnehin nur bei Bewegung (die
                 // 1800er-Testaufnahme kam trotz 6 Mbit/s Ziel bei 1 Mbit/s raus).
                 // Zu knapp wird dagegen sofort als matschige Schrift sichtbar.
-                AVVideoAverageBitRateKey: max(4_000_000, width * height * 5),
+                // 03.11.: 8 bit pro Pixel und Sekunde bei 30 fps (~ 0.27 bpp)
+                // statt 5; Mindestens 8 Mbit/s. Bei 3600x2000 sind das ~58 Mbit/s,
+                // damit bleibt feine Schrift scharf.
+                AVVideoAverageBitRateKey: max(8_000_000, width * height * 8),
+                AVVideoExpectedSourceFrameRateKey: 30,
                 AVVideoMaxKeyFrameIntervalKey: 60,
                 AVVideoAllowFrameReorderingKey: false,
             ],
@@ -482,7 +512,13 @@ private final class AVWriter: NSObject, SCStreamOutput, @unchecked Sendable {
             writer.startSession(atSourceTime: CMSampleBufferGetPresentationTimeStamp(sample))
             sessionStarted = true
         }
-        if input.isReadyForMoreMediaData { input.append(sample) }
+        if input.isReadyForMoreMediaData {
+            if input.append(sample) {
+                let t = CMTimeAdd(CMSampleBufferGetPresentationTimeStamp(sample),
+                                  CMSampleBufferGetDuration(sample).isValid ? CMSampleBufferGetDuration(sample) : .zero)
+                if !lastPTS.isValid || t > lastPTS { lastPTS = t }
+            }
+        }
     }
 
     /// Kopie des Samples mit um `offset` nach vorn gezogenem Zeitstempel.
@@ -518,6 +554,11 @@ private final class AVWriter: NSObject, SCStreamOutput, @unchecked Sendable {
         videoInput.markAsFinished()
         micInput?.markAsFinished()
         systemInput?.markAsFinished()
+        // Statischer Bildschirm: ScreenCaptureKit liefert dann nur bei Aenderungen
+        // Frames, die Videospur endete nach 1 s, der Ton lief 5 s (Test 03.11.).
+        // Session bis zum letzten Sample (Ton) verlaengern, dann haelt das letzte
+        // Bild bis zum Ende.
+        if sessionStarted, lastPTS.isValid { writer.endSession(atSourceTime: lastPTS) }
         await writer.finishWriting()
     }
 }

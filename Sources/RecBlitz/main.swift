@@ -36,6 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var recordedTwoAudioTracks = false
     /// Video der gerade verarbeiteten Aufnahme; wird an pipeline.py durchgereicht,
     /// die es nach Drive lädt und den Link in Doc + Obsidian schreibt.
+    /// Startton laeuft gerade (Aufnahme beginnt direkt danach).
+    private var cueStarting = false
     private var pendingVideoURL: URL?
     /// Läuft gerade ein Verwerfen? Der Mikro-Pfad liefert seine Datei erst über
     /// den Delegate, deshalb muss das Aufräumen dort wissen, dass niemand sie will.
@@ -164,7 +166,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         _ = await self.screenRecorder.stop()
                         print("OK \(out.path)")
                     } catch { print("FEHLER: \(error.localizedDescription)") }
-                    RecordingControlBar.shared.hide()
+                    RecordingControlBar.shared.hide(); RegionFrame.shared.hide()
                     WebcamBubble.shared.hide()
                     exit(0)
                 }
@@ -223,6 +225,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func toggle() {
+        if cueStarting { return }   // Startton laeuft, nicht doppelt starten
         switch phase {
         case .idle, .uploading: startRecording()
         case .armed:            startFromArmed()      // Kürzel = Play
@@ -313,7 +316,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func cancelArmed() {
         MainActor.assumeIsolated {
             CountdownOverlay.dismiss()
-            RecordingControlBar.shared.hide()
+            RecordingControlBar.shared.hide(); RegionFrame.shared.hide()
             WebcamBubble.shared.hide()
         }
         activeScope = nil
@@ -424,16 +427,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             includeSystemAudio: cfg.screenSystemAudio,
             captureMicrophone: cfg.captureMicrophone,
             // Die Mikrofon-Auswahl aus den Einstellungen gilt auch hier.
-            microphoneDeviceID: Recorder.currentMic()?.uniqueID,
+            microphoneDeviceID: Recorder.captureMicID(),
             maxDimension: audioOnly ? 320 : (cfg.screenMaxDimension > 0 ? cfg.screenMaxDimension : nil),
-            fps: audioOnly ? 1 : 30,
+            fps: audioOnly ? 1 : max(15, cfg.screenFPS),
             // Die Blase gehört uns und wäre sonst mit ausgeschlossen — sie soll
             // aber gerade zu sehen sein.
             includeWindowIDs: audioOnly ? [] : MainActor.assumeIsolated {
                 WebcamBubble.shared.windowID.map { [$0] } ?? []
             })
 
+        cueStarting = true
         Task { @MainActor in
+            await Cue.playStart()
+            cueStarting = false
             do {
                 try await screenRecorder.start(to: url, options: opts)
                 screenRecordingActive = true
@@ -471,7 +477,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                 + (audioOnly ? "\n" + L.t("Systemton braucht die Bildschirmaufnahme-Erlaubnis. Oder Systemton ausschalten, dann läuft nur das Mikrofon.",
                                                           "System audio needs the screen recording permission. Or turn system audio off to record the mic only.") : ""),
                             url: nil, isError: true)
-                RecordingControlBar.shared.hide()
+                RecordingControlBar.shared.hide(); RegionFrame.shared.hide()
                 activeScope = nil
                 phase = uploadsInFlight > 0 ? .uploading : .idle
             }
@@ -491,6 +497,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             screenRecordingActive = false
+            if !audioOnly { Cue.playStop() }
 
             if seconds < 2 {                       // Fehlklick-Schutz wie beim Mikro
                 try? FileManager.default.removeItem(at: videoURL)
@@ -515,7 +522,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     // kein Upload (pendingVideoURL bleibt leer).
                     try? FileManager.default.removeItem(at: videoURL)
                 } else {
-                    pendingVideoURL = videoURL
+                    // Original dauerhaft nach ~/Movies/RecBlitz (nie auto-löschen).
+                    pendingVideoURL = Recorder.keepOriginalVideo(videoURL)
                 }
                 handleRecordingFinished(url: audioURL, seconds: seconds)
             } catch {
@@ -540,6 +548,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                             url: nil, isError: true)
                 return
             }
+            self.cueStarting = true
+            Task { @MainActor in
+            await Cue.playStart()
+            self.cueStarting = false
             do {
                 try self.recorder.start()
                 self.phase = .recording
@@ -552,6 +564,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             } catch {
                 Banner.show(title: L.t("Aufnahme fehlgeschlagen", "Recording failed"),
                             subtitle: error.localizedDescription, url: nil, isError: true)
+            }
             }
         }
     }
@@ -569,6 +582,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID) == targetID
         }
         MainActor.assumeIsolated {
+            RegionFrame.shared.show(for: scope)
             RecordingControlBar.shared.show(
                 on: screen,
                 armed: armed,
@@ -585,7 +599,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func restartRecording() {
         guard screenRecordingActive, let scope = activeScope else { return }
         timer?.invalidate(); timer = nil
-        MainActor.assumeIsolated { RecordingControlBar.shared.hide() }
+        MainActor.assumeIsolated { RecordingControlBar.shared.hide(); RegionFrame.shared.hide() }
         Task { @MainActor in
             let result = await screenRecorder.stop()
             screenRecordingActive = false
@@ -619,7 +633,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // dem Bildschirm zu suchen (Rückmeldung 01.08.). Der Schalter bleibt an, beim
         // nächsten Vorbereiten kommt sie automatisch wieder.
         MainActor.assumeIsolated {
-            RecordingControlBar.shared.hide()
+            RecordingControlBar.shared.hide(); RegionFrame.shared.hide()
             WebcamBubble.shared.hide()
         }
         phase = .transcribing // sofortiges Feedback, Datei-Finalisierung kommt gleich
@@ -642,7 +656,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         MainActor.assumeIsolated {
-            RecordingControlBar.shared.hide()
+            RecordingControlBar.shared.hide(); RegionFrame.shared.hide()
             WebcamBubble.shared.hide()
         }
         discarding = true
@@ -838,26 +852,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     // das Video ist bei einem Screencast die Hauptsache.
                     bannerURL = videoURL
                     title = L.t("Video bereit · Link kopiert", "Video ready · link copied")
-                    // Erst löschen, wenn der Link WIRKLICH da ist und keine
-                    // Fehlermeldung dranhängt, lieber Platz verbrauchen als
-                    // eine Aufnahme verlieren.
-                    if ConfigStore.shared.deleteLocalAfterUpload,
-                       (result.video_error ?? "").isEmpty {
-                        self.deleteLocalRecording(self.uploadingVideoPath)
-                    }
+                    // Das Original bleibt lokal (~/Movies/RecBlitz), nie automatisch löschen.
                 } else if let local = self.uploadingVideoPath,
                           FileManager.default.fileExists(atPath: local.path) {
                     // Ohne Drive bleibt das Video lokal. Die Zeile „Zuletzt"
                     // öffnet es dann direkt, statt ins Leere zu zeigen.
                     videoURL = local
-                    self.uploadingVideoPath = nil
                 }
+                let keptLocal = self.uploadingVideoPath.flatMap {
+                    FileManager.default.fileExists(atPath: $0.path) ? $0.path : nil }
+                self.uploadingVideoPath = nil
                 if let vErr = result.video_error, !vErr.isEmpty {
                     sub += "\n⚠️ \(vErr)"
                 }
                 self.state.last = LastResult(title: result.title ?? L.t("Sprachnotiz", "Voice note"),
                                              date: Date(), docURL: docURL, videoURL: videoURL,
-                                             markdownPath: mdPath)
+                                             markdownPath: mdPath, localVideoPath: keptLocal)
                 self.state.last?.save()
                 Banner.show(title: title, subtitle: sub, url: bannerURL)
             } else {
@@ -866,22 +876,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                             url: nil, isError: true, seconds: 20)
             }
         }
-    }
-
-    /// Löscht Video und die daneben liegende extrahierte Tonspur.
-    private func deleteLocalRecording(_ video: URL?) {
-        guard let video else { return }
-        let audio = video.deletingPathExtension().appendingPathExtension("m4a")
-        for url in [video, audio] where FileManager.default.fileExists(atPath: url.path) {
-            do {
-                try FileManager.default.removeItem(at: url)
-                NSLog("RecBlitz: lokale Datei nach Upload gelöscht: %@", url.lastPathComponent)
-            } catch {
-                NSLog("RecBlitz: konnte %@ nicht löschen: %@", url.lastPathComponent,
-                      error.localizedDescription)
-            }
-        }
-        uploadingVideoPath = nil
     }
 
     // MARK: - Menüleisten-Icon
@@ -959,6 +953,18 @@ func renderToPNG<V: View>(_ view: V, path: String, dark: Bool) -> Bool {
     return (try? png.write(to: URL(fileURLWithPath: path))) != nil
 }
 
+// Banner-Design-Check: `--render-banner <png> [error]`
+if cliArgs.count >= 3, cliArgs[1] == "--render-banner" {
+    let isErr = cliArgs.contains("error")
+    let ok: Bool = MainActor.assumeIsolated {
+        renderToPNG(BannerView(title: isErr ? L.t("Aufnahme fehlgeschlagen", "Recording failed") : L.t("Video bereit · Link kopiert", "Video ready · link copied"),
+                               subtitle: isErr ? "Kein Mikrofon-Zugriff" : "Besprechung Onboarding und die zwei offenen Fragen",
+                               isError: isErr, hint: nil, hasLink: true, onTap: {}, onClose: {}),
+                    path: cliArgs[2], dark: true)
+    }
+    print(ok ? "OK" : "ERROR"); exit(ok ? 0 : 1)
+}
+
 if cliArgs.count >= 3, cliArgs[1] == "--render-panel" {
     let mode = cliArgs.count > 3 && !cliArgs[3].hasPrefix("--") ? cliArgs[3] : "idle"
     let dark = !cliArgs.contains("--light")
@@ -989,7 +995,8 @@ if cliArgs.count >= 3, cliArgs[1] == "--render-panel" {
                                                  "Onboarding flow walkthrough and the two open questions - 2026-09-26 10.29 - RecBlitz"),
                                     date: Date(), docURL: URL(string: "https://example.com/doc"),
                                     videoURL: mode == "idle" ? nil : URL(string: "https://example.com/video"),
-                                    markdownPath: nil)
+                                    markdownPath: nil,
+                                    localVideoPath: mode == "idle" ? nil : "/tmp/demo.mp4")
             dummy.lastTranscript = "…"
         }
         switch mode {
@@ -1048,7 +1055,7 @@ if cliArgs.count >= 6, cliArgs[1] == "--test-audio-only" {
         do {
             try await rec.start(to: video, options: ScreenRecorder.Options(
                 scope: .fullScreen(displayID: nil), includeSystemAudio: sys, captureMicrophone: mic,
-                microphoneDeviceID: Recorder.currentMic()?.uniqueID, maxDimension: 320, fps: 1))
+                microphoneDeviceID: Recorder.captureMicID(), maxDimension: 320, fps: 1))
             log("started")
             try await Task.sleep(nanoseconds: UInt64(secs * 1_000_000_000))
             guard let (v, d) = await rec.stop() else { log("ERROR stop nil"); exit(1) }
@@ -1062,6 +1069,45 @@ if cliArgs.count >= 6, cliArgs[1] == "--test-audio-only" {
             log("ERROR \(error.localizedDescription)")
             exit(1)
         }
+    }
+    let a = NSApplication.shared
+    a.setActivationPolicy(.accessory)
+    a.run()
+}
+
+// Qualitaets-/Overlay-Test: `--test-region <out.mp4> <sek> <x> <y> <w> <h> [displayID]`
+// nimmt einen Bereich (Punkte, Ursprung oben links) MIT sichtbarem Region-Rahmen auf.
+// Log: <out.mp4>.log. Danach ffprobe/ffmpeg auf die Datei.
+if cliArgs.count >= 8, cliArgs[1] == "--test-region" {
+    let out = URL(fileURLWithPath: cliArgs[2])
+    let secs = Double(cliArgs[3]) ?? 4
+    let rect = CGRect(x: Double(cliArgs[4]) ?? 0, y: Double(cliArgs[5]) ?? 0,
+                      width: Double(cliArgs[6]) ?? 800, height: Double(cliArgs[7]) ?? 500)
+    let did = cliArgs.count > 8 ? CGDirectDisplayID(cliArgs[8]) ?? CGMainDisplayID() : CGMainDisplayID()
+    func log(_ m: String) {
+        let line = m + "\n"
+        if let h = try? FileHandle(forWritingTo: URL(fileURLWithPath: out.path + ".log")) {
+            h.seekToEndOfFile(); h.write(line.data(using: .utf8)!); try? h.close()
+        } else { try? line.write(toFile: out.path + ".log", atomically: true, encoding: .utf8) }
+    }
+    try? FileManager.default.removeItem(atPath: out.path + ".log")
+    Task { @MainActor in
+        let rec = ScreenRecorder()
+        let scope = CaptureScope.region(rect, displayID: did)
+        RegionFrame.shared.show(for: scope)
+        await Cue.playStart()
+        log("cue done")
+        do {
+            try await rec.start(to: out, options: ScreenRecorder.Options(
+                scope: scope, includeSystemAudio: false, captureMicrophone: true,
+                microphoneDeviceID: Recorder.captureMicID(), maxDimension: nil, fps: 30))
+            log("started mic=\(Recorder.captureMicID() ?? "default")")
+            try await Task.sleep(nanoseconds: UInt64(secs * 1_000_000_000))
+            guard let (v, d) = await rec.stop() else { log("ERROR stop nil"); exit(1) }
+            RegionFrame.shared.hide()
+            log("DONE \(d)s size=\(AudioExtractor.fileSize(v))B")
+            exit(0)
+        } catch { log("ERROR \(error.localizedDescription)"); exit(1) }
     }
     let a = NSApplication.shared
     a.setActivationPolicy(.accessory)

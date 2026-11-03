@@ -18,6 +18,28 @@ final class Recorder: NSObject, AVCaptureFileOutputRecordingDelegate {
         return dir
     }
 
+    /// Dauerhafter Ort der Original-Videos. Wird nie automatisch geleert.
+    static var moviesDir: URL {
+        let dir = FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("RecBlitz", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    /// Verschiebt das fertige Video nach ~/Movies/RecBlitz und liefert den neuen
+    /// Pfad. Klappt das Verschieben nicht, bleibt das Video, wo es ist.
+    static func keepOriginalVideo(_ video: URL) -> URL {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd HH.mm.ss"
+        var dest = moviesDir.appendingPathComponent("RecBlitz \(df.string(from: Date())).mp4")
+        var n = 2
+        while FileManager.default.fileExists(atPath: dest.path) {
+            dest = moviesDir.appendingPathComponent("RecBlitz \(df.string(from: Date())) \(n).mp4"); n += 1
+        }
+        do { try FileManager.default.moveItem(at: video, to: dest); return dest }
+        catch { NSLog("RecBlitz: Video nicht nach Movies verschoben: %@", error.localizedDescription); return video }
+    }
+
     var isRecording: Bool { startedAt != nil }
     var elapsed: TimeInterval { startedAt.map { Date().timeIntervalSince($0) } ?? 0 }
 
@@ -28,13 +50,22 @@ final class Recorder: NSObject, AVCaptureFileOutputRecordingDelegate {
                                          mediaType: .audio, position: .unspecified).devices
     }
 
+    /// Gewählte Mikrofon-ID aus der Config (nil = System-Standard).
     static var selectedMicID: String? {
-        get { UserDefaults.standard.string(forKey: "selectedMicID") }
-        set { UserDefaults.standard.set(newValue, forKey: "selectedMicID") }
+        get { let v = ConfigStore.shared.micDeviceID; return v.isEmpty ? nil : v }
+        set { ConfigStore.shared.micDeviceID = newValue ?? ""; ConfigStore.shared.save() }
+    }
+
+    /// ID fürs Aufnehmen: das gewählte Gerät, solange es angesteckt ist, sonst nil
+    /// (= System-Standard). Ein abgezogenes Headset darf die Aufnahme nicht
+    /// blockieren.
+    static func captureMicID() -> String? {
+        guard let id = selectedMicID, availableMics().contains(where: { $0.uniqueID == id }) else { return nil }
+        return id
     }
 
     static func currentMic() -> AVCaptureDevice? {
-        if let id = selectedMicID, let d = availableMics().first(where: { $0.uniqueID == id }) {
+        if let id = captureMicID(), let d = availableMics().first(where: { $0.uniqueID == id }) {
             return d
         }
         return AVCaptureDevice.default(for: .audio)

@@ -45,8 +45,13 @@ final class ConfigStore: ObservableObject {
     /// Systemton mitnehmen (die andere Seite im Call, Videos). Default an,
     /// denn Telegram-Calls im „Nur Ton"-Modus hatten nur das Mikro (05.10.).
     @Published var screenSystemAudio: Bool = true
-    /// Längste Kante des Videos. 0 = native Auflösung.
-    @Published var screenMaxDimension: Int = 2560
+    /// Längste Kante des Videos. 0 = native Pixelauflösung (Default seit 03.11.,
+    /// vorher 2560 und damit bei großen Retina-Bereichen heruntergerechnet).
+    @Published var screenMaxDimension: Int = 0
+    /// Gewähltes Mikrofon (`uniqueID`). Leer = System-Standard (03.11.).
+    @Published var micDeviceID: String = ""
+    /// Bildrate der Bildschirmaufnahme.
+    @Published var screenFPS: Int = 30
     /// Eigener Drive-Ordner für Videos (leer = derselbe wie für die Docs).
     @Published var videoFolderInput: String = ""
     /// Welcher Bildschirm aufgenommen wird (CGDirectDisplayID). 0 = Hauptbildschirm.
@@ -55,7 +60,9 @@ final class ConfigStore: ObservableObject {
     /// Lokales Video löschen, sobald der Drive-Upload nachweislich geklappt hat.
     /// 146 MB nach einem einzigen Testnachmittag (Rückmeldung 01.08.), ohne das
     /// läuft die Platte still voll.
-    @Published var deleteLocalAfterUpload: Bool = true
+    /// Seit 03.11. ohne Wirkung: das Originalvideo bleibt immer lokal in
+    /// ~/Movies/RecBlitz. Das Feld bleibt nur, damit alte config.json lesbar ist.
+    @Published var deleteLocalAfterUpload: Bool = false
     /// Webcam-Blase während der Bildschirmaufnahme einblenden.
     @Published var webcamEnabled: Bool = false
     /// Durchmesser der Blase in Punkten.
@@ -94,11 +101,17 @@ final class ConfigStore: ObservableObject {
         screenMode = dict["screen_mode"] as? String ?? "off"
         screenSystemAudio = dict["screen_system_audio"] as? Bool ?? true
         captureMicrophone = dict["capture_microphone"] as? Bool ?? true
-        screenMaxDimension = dict["screen_max_dimension"] as? Int ?? 2560
+        // Der alte Default 2560 wurde als Wert mitgespeichert und hat Retina-
+        // Aufnahmen verkleinert: er zählt nur noch, wenn er bewusst anders ist.
+        let storedMax = dict["screen_max_dimension"] as? Int ?? 0
+        screenMaxDimension = storedMax == 2560 ? 0 : storedMax
+        micDeviceID = dict["mic_device_id"] as? String
+            ?? UserDefaults.standard.string(forKey: "selectedMicID") ?? ""
+        screenFPS = dict["screen_fps"] as? Int ?? 30
         videoFolderInput = dict["video_folder_id"] as? String ?? ""
         videoPublic = dict["video_public"] as? Bool ?? true
         screenDisplayID = dict["screen_display_id"] as? Int ?? 0
-        deleteLocalAfterUpload = dict["delete_local_after_upload"] as? Bool ?? true
+        deleteLocalAfterUpload = false
         countdownSeconds = dict["countdown_seconds"] as? Int ?? 3
         webcamEnabled = dict["webcam_enabled"] as? Bool ?? false
         webcamSize = dict["webcam_size"] as? Int ?? 160
@@ -139,6 +152,8 @@ final class ConfigStore: ObservableObject {
         raw["screen_system_audio"] = screenSystemAudio
         raw["capture_microphone"] = captureMicrophone
         raw["screen_max_dimension"] = screenMaxDimension
+        raw["mic_device_id"] = micDeviceID
+        raw["screen_fps"] = screenFPS
         raw["video_folder_id"] = ConfigStore.folderID(from: videoFolderInput)
         raw["video_public"] = videoPublic
         raw["screen_display_id"] = screenDisplayID
