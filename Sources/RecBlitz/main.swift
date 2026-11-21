@@ -64,6 +64,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Look.apply()
+        if CommandLine.arguments.contains("--check-panels") { runCheckPanels(); return }
+        if let i = CommandLine.arguments.firstIndex(of: "--demo-window") {
+            let a = CommandLine.arguments
+            runDemoWindow(kind: i + 1 < a.count ? a[i + 1] : "panel",
+                          state: i + 2 < a.count && !a[i + 2].hasPrefix("--") ? a[i + 2] : "idle")
+            return
+        }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.autosaveName = "RecBlitz" // Position in der Leiste bleibt gemerkt
         if let button = statusItem.button {
@@ -99,38 +107,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         state.lastTranscript = try? String(contentsOf: AppDelegate.lastTranscriptURL, encoding: .utf8)
         render()
 
-        // Verifikations-Hilfe: Meldung anzeigen, damit ihr Aussehen (u.a. das
-        // Schließen-× in der Ecke) per Screenshot geprüft werden kann.
-        if CommandLine.arguments.contains("--demo-banner") {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                Banner.show(title: L.t("Video bereit · Link kopiert", "Video ready · link copied"),
-                            subtitle: L.t("Kurzer Rundgang durch das neue Dashboard und die offenen Punkte.",
-                                          "A quick walkthrough of the new dashboard and the open items."),
-                            url: URL(string: "https://example.com"),
-                            seconds: 600,
-                            hint: L.t("Klick öffnet das Video", "Click opens the video"),
-                            screen: NSScreen.screens.count > 1
-                                ? NSScreen.screens.first(where: { $0 !== NSScreen.main })
-                                : nil)
-            }
-        }
-
-        // Verifikations-Hilfe: Panel UND Einstellungen öffnen, damit die
-        // Platzierung der Einstellungen relativ zum Panel prüfbar ist.
-        if CommandLine.arguments.contains("--demo-settings") {
-            let button = statusItem.button
-            let appState = state
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                MainActor.assumeIsolated {
-                    PanelController.shared.toggle(state: appState, statusButton: button)
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                    MainActor.assumeIsolated {
-                        SettingsPanelController.shared.toggle(anchor: PanelController.shared.frame)
-                    }
-                }
-            }
-        }
+        // Die alten Hilfen --demo-banner/--demo-settings sind weg (sie oeffneten Fenster auf dem externen Bildschirm).
+        // Ersatz: `--demo-window panel|settings|both|banner` (nur eingebauter Bildschirm, erfundene Daten).
 
         // Verifikations-Hilfe: echte Aufnahme MIT eingeblendeter Steuerleiste,
         // um zu prüfen dass die Leiste nicht im Video landet. Muss in der
@@ -194,13 +172,131 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                 MainActor.assumeIsolated { SettingsPanelController.shared.toggle(anchor: nil) }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                    let info = MainActor.assumeIsolated { SettingsPanelController.shared.debugInfo() }
+                    let info = MainActor.assumeIsolated { SettingsPanelController.shared.debugInfo }
                     try? info.write(toFile: NSTemporaryDirectory() + "recblitz_uitest.txt",
                                     atomically: true, encoding: .utf8)
                     exit(0)
                 }
             }
         }
+    }
+
+    /// Testfenster: `--demo-window panel|settings|both|banner [zustand] [--seconds=N] [--light] [--lang=en]`.
+    /// Oeffnet das ECHTE Fenster mit erfundenen Daten, NUR auf dem eingebauten Bildschirm, schreibt Fenster-ID,
+    /// Rahmen und Ebene in `$TMPDIR/recblitz_demo.txt` und beendet sich nach 20 s (oder `--seconds=N`).
+    /// Kein Menueleisten-Symbol, kein Hotkey, keine Aufnahme, liest/schreibt keine Konfiguration.
+    private func runDemoWindow(kind: String, state st: String) {
+        let builtin = NSScreen.screens.first { s in
+            (s.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID)
+                .map { CGDisplayIsBuiltin($0) != 0 } ?? false
+        }
+        guard let screen = builtin else {
+            print("KEIN eingebauter Bildschirm, Demo abgebrochen"); exit(2)
+        }
+        let secs = CommandLine.arguments.compactMap { a -> Double? in
+            a.hasPrefix("--seconds=") ? Double(a.dropFirst(10)) : nil }.first ?? 20
+        demoState = Demo.state(mode: st)
+        let vf = screen.visibleFrame
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [self] in
+            MainActor.assumeIsolated {
+                switch kind {
+                case "settings":
+                    SettingsPanelController.shared.toggle(
+                        anchor: CGRect(x: vf.maxX - 392, y: vf.maxY - 330, width: 392, height: 330), screen: screen)
+                case "banner":
+                    Banner.show(title: st == "error" ? L.t("Aufnahme fehlgeschlagen", "Recording failed")
+                                                     : L.t("Video bereit · Link kopiert", "Video ready · link copied"),
+                                subtitle: st == "error" ? L.t("Kein Mikrofon-Zugriff", "No microphone access")
+                                                        : L.t("Besprechung Onboarding und die zwei offenen Fragen",
+                                                              "Onboarding meeting and the two open questions"),
+                                url: nil, isError: st == "error", seconds: 600,
+                                hint: st == "error" ? nil : L.t("Klick öffnet das Video", "Click opens the video"),
+                                screen: screen)
+                default:
+                    PanelController.shared.toggle(state: demoState!, statusButton: nil, screen: screen)
+                    if kind == "both" {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            MainActor.assumeIsolated {
+                                SettingsPanelController.shared.toggle(anchor: PanelController.shared.glassFrame, screen: screen)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for t in [1.5, 3.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + t) { Self.dumpDemoWindows() }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + secs) { exit(0) }
+    }
+
+    private var demoState: AppState?
+
+    /// Waechter `--check-panels`: oeffnet Panel, Einstellungen und Banner (erfundene Daten, nur eingebauter
+    /// Bildschirm) und prueft von jedem Fenster Ebene (.floating), Aussehen (passt zu Look), Breite und dass es auf dem
+    /// eingebauten Bildschirm liegt. Exit 0 = gruen, 1 = rot. `RB_CHECK_BREAK=1` dreht die Erwartung absichtlich um
+    /// (Gegenprobe: der Check muss dann ROT werden).
+    private func runCheckPanels() {
+        guard let screen = NSScreen.screens.first(where: { s in
+            (s.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID)
+                .map { CGDisplayIsBuiltin($0) != 0 } ?? false }) else { print("FAIL kein eingebauter Bildschirm"); exit(2) }
+        let broken = ProcessInfo.processInfo.environment["RB_CHECK_BREAK"] != nil
+        demoState = Demo.state(mode: "idle")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [self] in
+            MainActor.assumeIsolated {
+                PanelController.shared.toggle(state: demoState!, statusButton: nil, screen: screen)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    MainActor.assumeIsolated {
+                        SettingsPanelController.shared.toggle(anchor: PanelController.shared.glassFrame, screen: screen)
+                    }
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    Banner.show(title: "Check", subtitle: "Check", url: nil, seconds: 60, screen: screen)
+                }
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            var fails: [String] = []
+            var checked = 0
+            let wantLevel = broken ? NSWindow.Level.popUpMenu : NSWindow.Level.floating
+            MainActor.assumeIsolated {
+                for w in NSApp.windows where w.isVisible {
+                    checked += 1
+                    let name = String(describing: type(of: w))
+                    if w.level != wantLevel { fails.append("\(name): Ebene \(w.level.rawValue), erwartet \(wantLevel.rawValue)") }
+                    if !Look.matches(w) { fails.append("\(name): Aussehen passt nicht zu Look \(Look.mode)") }
+                    if !screen.frame.intersects(w.frame) { fails.append("\(name): nicht auf dem eingebauten Bildschirm") }
+                    if name == "StagePanel" || name == "ThemePanel",
+                       abs(w.frame.width - (Theme.widgetWidth + 2 * Theme.stageInset)) > 0.5 {
+                        fails.append("\(name): Breite \(w.frame.width)")
+                    }
+                    print("  \(name) Ebene \(w.level.rawValue) Aussehen \(w.effectiveAppearance.name.rawValue) \(Int(w.frame.width))x\(Int(w.frame.height))")
+                }
+                // Gegenprobe des Aussehens-Checks: mit umgedrehtem Aussehen muss Look.matches false liefern.
+                if let w = NSApp.windows.first(where: { $0.isVisible }) {
+                    let saved = NSApp.appearance
+                    NSApp.appearance = NSAppearance(named: Look.mode == .light ? .darkAqua : .aqua)
+                    if Look.mode != .system, Look.matches(w) { fails.append("Gegenprobe: Look.matches blieb true bei falschem Aussehen") }
+                    NSApp.appearance = saved
+                }
+            }
+            if checked < 3 { fails.append("nur \(checked) Fenster sichtbar, erwartet 3") }
+            if fails.isEmpty { print("check-panels OK (\(checked) Fenster)"); exit(0) }
+            for f in fails { print("FAIL: \(f)") }
+            exit(1)
+        }
+    }
+
+    /// Fenster-ID, Rahmen (Punkte, Ursprung oben links wie CGWindowList), Ebene und Alpha in eine Datei.
+    private static func dumpDemoWindows() {
+        let h = NSScreen.screens.first?.frame.height ?? 0
+        var lines: [String] = []
+        for w in NSApp.windows where w.isVisible {
+            let f = w.frame
+            lines.append("id=\(w.windowNumber) class=\(type(of: w)) x=\(f.minX) y=\(h - f.maxY) w=\(f.width) h=\(f.height) level=\(w.level.rawValue) alpha=\(w.alphaValue) key=\(w.isKeyWindow)")
+        }
+        try? lines.joined(separator: "\n").write(toFile: NSTemporaryDirectory() + "recblitz_demo.txt",
+                                                  atomically: true, encoding: .utf8)
     }
 
     /// Nur für den Prüfmodus.
@@ -925,89 +1021,124 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 //   RecBlitz --selftest                      prüft reine Logik, Exit 1 bei Fehler
 let cliArgs = CommandLine.arguments
 
-/// Rendert eine SwiftUI-Ansicht über ein echtes, unsichtbares Fenster. Anders
-/// als `ImageRenderer` zeichnet das auch AppKit-Steuerelemente (Schalter,
-/// Segment-Picker, Textfelder) richtig, statt gelber Platzhalter.
+// Gemeinsame Schalter fuer alle Test-Modi.
+//   --lang=en|de   feste Sprache (ohne die gespeicherte Wahl anzufassen)
+//   --demo-config  erfundene Daten statt der echten Konfiguration (PFLICHT fuer jedes Foto)
+//   --light        helles Aussehen
+//   --bg=gray|white|black|clear   Untergrund der Test-Bilder (Standard grau)
+if let l = cliArgs.first(where: { $0.hasPrefix("--lang=") }) { L.override = String(l.dropFirst(7)) }
+if cliArgs.contains("--demo-config") || cliArgs.contains("--demo-window") || cliArgs.contains("--check-panels") {
+    ConfigStore.useDefaultsOnly = true
+    Demo.on = true
+}
+if cliArgs.contains("--render-panel") || cliArgs.contains("--render-settings")
+    || cliArgs.contains("--render-banner") || cliArgs.contains("--render-region") {
+    Theme.flatGlass = true
+}
+
+func renderBackground() -> NSColor? {
+    switch cliArgs.first(where: { $0.hasPrefix("--bg=") }).map({ String($0.dropFirst(5)) }) ?? "gray" {
+    case "white": return NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 1)
+    case "black": return NSColor(srgbRed: 0, green: 0, blue: 0, alpha: 1)
+    case "clear": return nil
+    default: return NSColor(srgbRed: 0.5, green: 0.5, blue: 0.5, alpha: 1)
+    }
+}
+
+/// Rendert eine NSView ueber ein echtes, unsichtbares Fenster (zeichnet auch AppKit-Steuerelemente),
+/// als sRGB-PNG, 2x (Retina). Offscreen gibt es kein Liquid Glass, siehe `Theme.flatGlass`.
 @MainActor
-func renderToPNG<V: View>(_ view: V, path: String, dark: Bool) -> Bool {
-    let host = NSHostingView(rootView: view)
-    host.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
-    host.layoutSubtreeIfNeeded()
-    let size = host.fittingSize
+func renderToPNG(_ host: NSView, size: CGSize, path: String, dark: Bool, bg: NSColor?) -> Bool {
+    let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+    host.appearance = appearance
     let window = NSWindow(contentRect: CGRect(origin: .zero, size: size),
                           styleMask: [.borderless], backing: .buffered, defer: false)
-    window.appearance = host.appearance
-    // Grund ungefähr wie das Popover-Material im Dunkel- bzw. Hellmodus.
-    let bg = NSView(frame: CGRect(origin: .zero, size: size))
-    bg.wantsLayer = true
-    bg.layer?.backgroundColor = (dark ? NSColor(srgbRed: 0.145, green: 0.153, blue: 0.180, alpha: 1)
-                                      : NSColor(srgbRed: 0.945, green: 0.945, blue: 0.955, alpha: 1)).cgColor
-    host.frame = bg.bounds
-    bg.addSubview(host)
-    window.contentView = bg
-    bg.layoutSubtreeIfNeeded()
-    bg.displayIfNeeded()
-    guard let rep = bg.bitmapImageRepForCachingDisplay(in: bg.bounds) else { return false }
-    bg.cacheDisplay(in: bg.bounds, to: rep)
+    window.appearance = appearance
+    window.isOpaque = false
+    window.backgroundColor = .clear
+    let root = NSView(frame: CGRect(origin: .zero, size: size))
+    root.wantsLayer = true
+    root.layer?.backgroundColor = (bg ?? .clear).cgColor
+    host.frame = root.bounds
+    root.addSubview(host)
+    window.contentView = root
+    // SwiftUI misst Inhalte (Reiter-Hoehe, Klapp-Bereiche) erst nach dem ersten Layout: Runloop kurz laufen lassen.
+    for _ in 0..<3 {
+        root.layoutSubtreeIfNeeded()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.15))
+    }
+    root.displayIfNeeded()
+    guard let raw = root.bitmapImageRepForCachingDisplay(in: root.bounds) else { return false }
+    root.cacheDisplay(in: root.bounds, to: raw)
+    let rep = raw.converting(to: .sRGB, renderingIntent: .default) ?? raw
     guard let png = rep.representation(using: .png, properties: [:]) else { return false }
     return (try? png.write(to: URL(fileURLWithPath: path))) != nil
 }
 
-// Banner-Design-Check: `--render-banner <png> [error]`
+@MainActor
+func renderToPNG<V: View>(_ view: V, path: String, dark: Bool, bg: NSColor? = renderBackground()) -> Bool {
+    let host = NSHostingView(rootView: view)
+    host.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+    // Erst in einem Hilfsfenster laufen lassen, damit SwiftUI seine Messungen (Reiter-Hoehe, Klapp-Bereiche)
+    // abschliesst; danach erst die Groesse nehmen.
+    let tmp = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 600, height: 1600),
+                       styleMask: [.borderless], backing: .buffered, defer: false)
+    tmp.appearance = host.appearance
+    tmp.contentView = host
+    for _ in 0..<3 {
+        host.layoutSubtreeIfNeeded()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.15))
+    }
+    let size = host.fittingSize
+    tmp.contentView = nil
+    return renderToPNG(host, size: size, path: path, dark: dark, bg: bg)
+}
+
+// Banner-Design-Check: `--render-banner <png> [error] [--light]`
 if cliArgs.count >= 3, cliArgs[1] == "--render-banner" {
     let isErr = cliArgs.contains("error")
     let ok: Bool = MainActor.assumeIsolated {
         renderToPNG(BannerView(title: isErr ? L.t("Aufnahme fehlgeschlagen", "Recording failed") : L.t("Video bereit · Link kopiert", "Video ready · link copied"),
-                               subtitle: isErr ? "Kein Mikrofon-Zugriff" : "Besprechung Onboarding und die zwei offenen Fragen",
+                               subtitle: isErr ? L.t("Kein Mikrofon-Zugriff", "No microphone access")
+                                               : L.t("Besprechung Onboarding und die zwei offenen Fragen", "Onboarding meeting and the two open questions"),
                                isError: isErr, hint: nil, hasLink: true, onTap: {}, onClose: {}),
-                    path: cliArgs[2], dark: true)
+                    path: cliArgs[2], dark: !cliArgs.contains("--light"))
     }
     print(ok ? "OK" : "ERROR"); exit(ok ? 0 : 1)
+}
+
+// Bereichsrahmen-Check: `--render-region <png>` (600x400, Loch 300x200 bei (150,100), Untergrund hellgrau)
+if cliArgs.count >= 3, cliArgs[1] == "--render-region" {
+    let ok: Bool = MainActor.assumeIsolated {
+        let v = DimView(frame: CGRect(x: 0, y: 0, width: 600, height: 400))
+        v.hole = CGRect(x: 150, y: 100, width: 300, height: 200)
+        return renderToPNG(v, size: v.frame.size, path: cliArgs[2], dark: true,
+                           bg: NSColor(srgbRed: 0.8, green: 0.8, blue: 0.8, alpha: 1))
+    }
+    print(ok ? "OK" : "ERROR"); exit(ok ? 0 : 1)
+}
+
+// Einstellungen: `--render-settings <png> <reiter 0-3> [--light]`
+if cliArgs.count >= 3, cliArgs[1] == "--render-settings" {
+    let tab = cliArgs.count > 3 ? Int(cliArgs[3]) ?? 0 : 0
+    let ok: Bool = MainActor.assumeIsolated {
+        renderToPNG(SettingsPane(tab: tab), path: cliArgs[2], dark: !cliArgs.contains("--light"))
+    }
+    print(ok ? "OK \(cliArgs[2])" : "ERROR render"); exit(ok ? 0 : 1)
 }
 
 if cliArgs.count >= 3, cliArgs[1] == "--render-panel" {
     let mode = cliArgs.count > 3 && !cliArgs[3].hasPrefix("--") ? cliArgs[3] : "idle"
     let dark = !cliArgs.contains("--light")
-    // Doku-Bilder: feste Sprache und Voreinstellungen statt der echten Konfiguration.
-    if let l = cliArgs.first(where: { $0.hasPrefix("--lang=") }) { L.override = String(l.dropFirst(7)) }
-    if cliArgs.contains("--demo-config") { ConfigStore.useDefaultsOnly = true }
     if let m = cliArgs.first(where: { $0.hasPrefix("--mode=") }) {
         ConfigStore.shared.screenMode = String(m.dropFirst(7))
     }
     let ok: Bool = MainActor.assumeIsolated {
-        if mode.hasPrefix("settings") {
-            // Reiter vorwählen und danach zurückstellen, damit der Design-Check
-            // nicht verändert, wo sich die Einstellungen das nächste Mal öffnen.
-            let previous = UserDefaults.standard.object(forKey: "settingsTab")
-            if let n = Int(mode.split(separator: "=").last ?? "") {
-                UserDefaults.standard.set(n, forKey: "settingsTab")
-            }
-            defer { UserDefaults.standard.set(previous, forKey: "settingsTab") }
-            return renderToPNG(SettingsPane(), path: cliArgs[2], dark: dark)
+        if mode.hasPrefix("settings") {   // alte Schreibweise, bleibt lesbar
+            return renderToPNG(SettingsPane(tab: Int(mode.split(separator: "=").last ?? "") ?? 0),
+                               path: cliArgs[2], dark: dark)
         }
-        let dummy = AppState()
-        // Beispieldaten für das Bild, nicht das echte letzte Ergebnis: ein
-        // Design-Check darf keine privaten Titel zeigen.
-        dummy.last = nil
-        dummy.lastTranscript = nil
-        if mode != "empty" {
-            dummy.last = LastResult(title: L.t("Ablauf für das neue Onboarding und die zwei offenen Fragen - 2026-09-26 10.29 - RecBlitz",
-                                                 "Onboarding flow walkthrough and the two open questions - 2026-09-26 10.29 - RecBlitz"),
-                                    date: Date(), docURL: URL(string: "https://example.com/doc"),
-                                    videoURL: mode == "idle" ? nil : URL(string: "https://example.com/video"),
-                                    markdownPath: nil,
-                                    localVideoPath: mode == "idle" ? nil : "/tmp/demo.mp4")
-            dummy.lastTranscript = "…"
-        }
-        switch mode {
-        case "recording": dummy.phase = .recording; dummy.elapsed = 42
-        case "paused":    dummy.phase = .recording; dummy.elapsed = 42; dummy.paused = true
-        case "armed":     dummy.phase = .armed
-        case "uploading": dummy.phase = .uploading; dummy.uploading = true
-                          dummy.uploadingVideo = true; dummy.uploadProgress = 64
-        default: break
-        }
-        return renderToPNG(RecPanelView(state: dummy, onSize: { _ in }), path: cliArgs[2], dark: dark)
+        return renderToPNG(RecPanelView(state: Demo.state(mode: mode), onSize: { _ in }), path: cliArgs[2], dark: dark)
     }
     print(ok ? "OK \(cliArgs[2])" : "ERROR render")
     exit(ok ? 0 : 1)
@@ -1027,6 +1158,35 @@ if cliArgs.count >= 2, cliArgs[1] == "--selftest" {
     let roundTrip = (try? JSONEncoder().encode(sample)).flatMap { try? JSONDecoder().decode(LastResult.self, from: $0) }
     expect(roundTrip == sample, "LastResult JSON-Rundreise")
     expect(FileManager.default.fileExists(atPath: PipelineRunner.scriptPath), "pipeline.py im Bundle")
+    // Runde 18: Theme-Werte (Rotprobe: RB_SELFTEST_BREAK=1 dreht eine Erwartung um, der Test MUSS dann rot werden).
+    let broken = ProcessInfo.processInfo.environment["RB_SELFTEST_BREAK"] != nil
+    expect(Theme.windowRadius == 26 && Theme.radius == 10 && Theme.innerRadius == 8 && Theme.smallRadius == 4,
+           "Theme-Ecken 26/10/8/4")
+    expect(Theme.rowHeight == (broken ? 33 : 32) && Theme.rowGap == 4 && Theme.primaryHeight == 36 && Theme.stageInset == 16,
+           "Theme-Zeilen 32/4, Hauptknopf 36, Buehne 16")
+    do {
+        let c = Theme.blueNS.usingColorSpace(.sRGB) ?? Theme.blueNS
+        let rgb = [c.redComponent, c.greenComponent, c.blueComponent].map { Int(($0 * 255).rounded()) }
+        expect(rgb == [41, 107, 250], "Akzent #296BFA, war \(rgb)")
+    }
+    expect([Theme.size(.big), Theme.size(.title), Theme.size(.heading), Theme.size(.normal), Theme.size(.small)] == [44, 22, 15, 13, 11],
+           "Schriftstufen 44/22/15/13/11")
+    expect(Look.mode == .dark || UserDefaults.standard.string(forKey: Look.appearanceKey) != nil,
+           "Aussehen ohne gespeicherte Wahl = Dunkel")
+    do {   // Testmodus liefert nur erfundene Mikrofone
+        Demo.on = true; defer { Demo.on = false }
+        let names = Recorder.micList().map(\.name)
+        expect(names == ["MacBook Pro Microphone", "USB Mic Demo"], "Demo-Mikrofone erfunden, war \(names)")
+    }
+    do {   // Testmodus schreibt keine config.json
+        let path = ConfigStore.path
+        let before = try? Data(contentsOf: URL(fileURLWithPath: path))
+        let wasDemo = ConfigStore.useDefaultsOnly
+        ConfigStore.useDefaultsOnly = true; defer { ConfigStore.useDefaultsOnly = wasDemo }
+        ConfigStore.shared.save()
+        let after = try? Data(contentsOf: URL(fileURLWithPath: path))
+        expect(before == after, "save() im Testmodus laesst config.json unveraendert")
+    }
     if failures.isEmpty {
         print("selftest OK")
         exit(0)

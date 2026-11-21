@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.0 (2026-11-21)
+
+The whole app was rebuilt in the same design as the sister app MeetingBlitz.
+
+- New look: panel, settings and result banner are Liquid Glass with a round
+  close button on the corner
+- Appearance in Settings → General: System, Light or Dark. Glass Normal or
+  Clearer
+- Settings are cleaner: four tabs (General, Transcript, Screen, Drive).
+  Language, microphone list and the Mic, System and Webcam switches live only
+  in the panel
+- The result banner is a glass capsule in the same colour as the other windows
+- Selection bars match MeetingBlitz and no two buttons touch each other
+
 ## 2.1 (2026-10-05)
 
 - The mode *Audio* is now *Audio only*

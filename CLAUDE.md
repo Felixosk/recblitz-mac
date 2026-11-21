@@ -33,7 +33,7 @@ convenience assumes it is. That explains most of the quirks below.
 | `Sources/BlitzKit/` | screen recording engine: `ScreenRecorder`, `RegionPicker`, `CountdownOverlay`, `RecordingControlBar`, `WebcamBubble`, `AudioExtractor`, `AudioMixdown`, `PanelDock` |
 | `pipeline.py` | title/summary (Claude CLI), Markdown note, Google Doc and video upload (rclone). Bundled into `Contents/Resources` |
 | `design/make_icon.swift` | draws `AppIcon.icns` |
-| `docs/` | README images, rendered from HTML around real app renders |
+| `docs/` | website (`index.html`, `features.html`, `setup.html`, `changelog.html`) and `img/` with the pictures, rendered with `--render-panel`/`--render-settings`/`--render-banner --demo-config --bg=clear` |
 
 ## 3. Build and run
 

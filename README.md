@@ -5,7 +5,7 @@ Click the icon, talk, click again. You get a titled Markdown note with the full
 transcript, and if you want, a Google Doc and a Drive link to the video on your
 clipboard.
 
-### ⬇ [Download RecBlitz 2.1](https://github.com/Felixosk/recblitz-mac/releases/latest/download/RecBlitz.zip)
+### ⬇ [Download RecBlitz 3.0](https://github.com/Felixosk/recblitz-mac/releases/latest/download/RecBlitz.zip)
 
 Ready-made app · 1.8 MB · macOS 14+ (transcription needs macOS 26) · Apple Silicon **and** Intel ·
 [one extra command on first launch](#option-a-download-the-ready-made-app) ·
@@ -18,7 +18,10 @@ sister app: [MeetingBlitz](https://github.com/Felixosk/meetingblitz-mac)
 
 [![Build](https://github.com/Felixosk/recblitz-mac/actions/workflows/build.yml/badge.svg)](https://github.com/Felixosk/recblitz-mac/actions/workflows/build.yml)
 
-![A screen recording in progress, the finished note and the result banner](docs/hero.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/hero-dark.png">
+  <img src="docs/img/hero-light.png" alt="The RecBlitz panel next to its settings window" width="820">
+</picture>
 
 ## Why this exists
 
@@ -45,7 +48,12 @@ RecBlitz does the boring part in between:
 
 Native Swift and SwiftUI, no Electron, no server, no account.
 
-![The menu bar panel, ready and while a video uploads](docs/panel.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/panel-uploading-dark.png">
+  <img src="docs/img/panel-uploading-light.png" alt="The panel while a video uploads, with progress and the latest recording" width="400">
+</picture>
+
+Banner, settings and the light look are on the [website](https://felixosk.github.io/recblitz-mac/).
 
 ## How it compares
 

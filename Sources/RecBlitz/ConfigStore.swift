@@ -85,7 +85,14 @@ final class ConfigStore: ObservableObject {
     /// und Pfade. Muss VOR dem ersten Zugriff auf `shared` gesetzt werden.
     nonisolated(unsafe) static var useDefaultsOnly = false
 
-    init() { if !ConfigStore.useDefaultsOnly { load() } }
+    init() {
+        if !ConfigStore.useDefaultsOnly { load() } else if Demo.on {
+            // Testmodus: erfundene Werte statt der echten Konfiguration.
+            markdownDir = Demo.notesFolder
+            driveEnabled = true
+            driveFolderInput = Demo.driveFolder
+        }
+    }
 
     func load() {
         guard let data = FileManager.default.contents(atPath: ConfigStore.path),

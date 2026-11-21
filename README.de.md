@@ -5,7 +5,7 @@ Klick aufs Symbol, sprechen, nochmal klicken. Du bekommst eine Markdown-Notiz
 mit Titel und dem ganzen Transkript, und wenn du willst, ein Google Doc und den
 Drive-Link zum Video in der Zwischenablage.
 
-### ⬇ [RecBlitz 2.1 herunterladen](https://github.com/Felixosk/recblitz-mac/releases/latest/download/RecBlitz.zip)
+### ⬇ [RecBlitz 3.0 herunterladen](https://github.com/Felixosk/recblitz-mac/releases/latest/download/RecBlitz.zip)
 
 Fertige App · 1,8 MB · macOS 14+ (Transkription braucht macOS 26) · Apple Silicon **und** Intel ·
 [ein Befehl beim ersten Start](#variante-a-fertige-app-herunterladen) ·
@@ -18,7 +18,10 @@ Schwester-App: [MeetingBlitz](https://github.com/Felixosk/meetingblitz-mac)
 
 [![Build](https://github.com/Felixosk/recblitz-mac/actions/workflows/build.yml/badge.svg)](https://github.com/Felixosk/recblitz-mac/actions/workflows/build.yml)
 
-![Eine laufende Bildschirmaufnahme, die fertige Notiz und die Meldung](docs/hero.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/hero-dark.png">
+  <img src="docs/img/hero-light.png" alt="Das RecBlitz-Panel neben den Einstellungen (englische Oberfläche)" width="820">
+</picture>
 
 ## Warum es das gibt
 
@@ -48,7 +51,10 @@ RecBlitz erledigt den langweiligen Teil dazwischen:
 
 Natives Swift und SwiftUI, kein Electron, kein Server, kein Konto.
 
-![Das Menüleisten-Panel, bereit und während ein Video hochlädt](docs/panel.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/panel-uploading-dark.png">
+  <img src="docs/img/panel-uploading-light.png" alt="Das Panel während ein Video hochlädt (englische Oberfläche)" width="400">
+</picture>
 
 ## Im Vergleich
 

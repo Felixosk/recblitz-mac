@@ -48,7 +48,7 @@ final class RegionFrame {
     }
 }
 
-private final class DimView: NSView {
+final class DimView: NSView {
     /// Bereich in Punkten, Ursprung oben links (wie `sourceRect`).
     var hole: CGRect?
     override var isFlipped: Bool { true }
@@ -57,15 +57,15 @@ private final class DimView: NSView {
         let dim = NSBezierPath(rect: bounds)
         if let h = hole { dim.append(NSBezierPath(rect: h)) }
         dim.windingRule = .evenOdd
-        NSColor.black.withAlphaComponent(hole == nil ? 0.22 : 0.34).setFill()
+        NSColor.black.withAlphaComponent(hole == nil ? Theme.regionDimEmpty : Theme.regionDim).setFill()
         dim.fill()
         guard let h = hole else { return }
         // Rahmen komplett AUSSERHALB des Bereichs.
-        let line: CGFloat = 2
+        let line = Theme.regionLine
         let ring = NSBezierPath(rect: h.insetBy(dx: -line, dy: -line))
         ring.append(NSBezierPath(rect: h))
         ring.windingRule = .evenOdd
-        Theme.accentNS.withAlphaComponent(0.95).setFill()
+        Theme.blueNS.withAlphaComponent(Theme.regionLineAlpha).setFill()
         ring.fill()
     }
 }

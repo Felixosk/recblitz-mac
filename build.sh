@@ -9,47 +9,17 @@ cd "$(dirname "$0")"
 
 APP_NAME="RecBlitz"
 BUNDLE_ID="app.recblitz.RecBlitz"
-VERSION="2.1"
+VERSION="3.0"
 BUILD_NUMBER="21"
 DIST="dist"
 APP="$DIST/$APP_NAME.app"
 
 # ---------------------------------------------------------------------------
-# Lint: Hinweistexte muessen umbrechen duerfen (aus MeetingBlitz uebernommen).
-#
-# In diesen selbstvermessenden Panels bekommt ein `Text` ohne
-# `.fixedSize(horizontal: false, vertical: true)` seine EINZEILIGE Wunschbreite
-# vorgeschlagen und wird bei 300pt Panelbreite hinten abgeschnitten, statt
-# umzubrechen. Das faellt im Code nicht auf und im Screenshot erst spaet.
+# Lint (Runde 18): Quelltext-Waechter in tools/lint.py. Keine losen Zahlen ausserhalb Theme.swift,
+# Hinweistexte nur ueber ThemeNote (brechen um statt abgeschnitten zu werden), keine Move-Transitions.
 # ---------------------------------------------------------------------------
-echo "==> Hinweistexte pruefen (Umbruch statt Abschneiden)"
-python3 - <<'LINT' || exit 1
-import re, glob, sys
-bad = []
-for path in glob.glob("Sources/RecBlitz/*.swift"):
-    lines = open(path).read().split("\n")
-    for i, line in enumerate(lines):
-        if "foregroundStyle(.secondary)" not in line:
-            continue
-        if not ("size: 10" in line or "size: 11" in line or "size: 10" in lines[i-1]):
-            continue
-        block = "\n".join(l for l in lines[max(0, i-3):i+1]
-                          if not l.strip().startswith("//") and "systemName" not in l)
-        literals = [t for t in re.findall(r'"([^"]{2,})"', block) if "\\(" not in t]
-        if max((len(t) for t in literals), default=0) < 45:
-            continue
-        window = "\n".join(lines[i:i+3])
-        if "fixedSize" in window or "lineLimit" in window:
-            continue
-        bad.append(f"{path}:{i+1}  {literals[0][:60]}...")
-if bad:
-    print("!! ABBRUCH: Hinweistexte ohne Umbruch, sie werden abgeschnitten:")
-    for b in bad:
-        print("   " + b)
-    print("   Fix: .fixedSize(horizontal: false, vertical: true) hinter den Text haengen.")
-    sys.exit(1)
-print("    alle langen Hinweistexte duerfen umbrechen")
-LINT
+echo "==> Quelltext pruefen (tools/lint.py)"
+python3 tools/lint.py || exit 1
 
 echo "==> Pipeline-Selbsttest"
 python3 pipeline.py --selftest

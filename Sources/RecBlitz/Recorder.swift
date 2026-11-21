@@ -50,6 +50,17 @@ final class Recorder: NSObject, AVCaptureFileOutputRecordingDelegate {
                                          mediaType: .audio, position: .unspecified).devices
     }
 
+    /// Eingaenge als (id, Name). Im Testmodus nur erfundene Geraete.
+    static func micList() -> [(id: String, name: String)] {
+        if Demo.on { return Demo.mics }
+        return availableMics().map { ($0.uniqueID, $0.localizedName) }
+    }
+
+    /// Name des System-Standards (nil, wenn keiner da ist).
+    static func defaultMicName() -> String? {
+        Demo.on ? Demo.defaultMicName : AVCaptureDevice.default(for: .audio)?.localizedName
+    }
+
     /// Gewählte Mikrofon-ID aus der Config (nil = System-Standard).
     static var selectedMicID: String? {
         get { let v = ConfigStore.shared.micDeviceID; return v.isEmpty ? nil : v }
